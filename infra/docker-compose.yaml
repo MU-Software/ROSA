@@ -1,0 +1,11 @@
+name: rosa-poca
+
+services:
+  redis:
+    image: redis:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+    ports:
+    - ${REDIS_PORT:?Please create .env file on project root and set REDIS_PORT}:6379
