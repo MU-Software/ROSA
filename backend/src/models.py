@@ -187,10 +187,9 @@ class AppState(Devices, Config, pydantic.BaseModel):
                 self.desk_status = "idle"
             return self
 
-        if self.handled_order and self.handled_order[-1] != self.order:
-            if self.order in self.handled_order:
-                self.handled_order.remove(self.order)
-            self.handled_order.append(self.order)
+        if self.order in self.handled_order:
+            self.handled_order.remove(self.order)
+        self.handled_order.append(self.order)
         self.desk_status = "registering"
         return self
 
