@@ -22,7 +22,7 @@ ifeq (docker-build,$(firstword $(MAKECMDGOALS)))
   IMAGE_NAME := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
   $(eval $(IMAGE_NAME):;@:)
 endif
-IMAGE_NAME := $(if $(IMAGE_NAME),$(IMAGE_NAME),ROSA_image)
+IMAGE_NAME := $(if $(IMAGE_NAME),$(IMAGE_NAME),rosa_image)
 
 ifeq ($(DOCKER_DEBUG),true)
 	DOCKER_MID_BUILD_OPTIONS = --progress=plain --no-cache
@@ -45,10 +45,10 @@ docker-compose-rm: docker-compose-down
 # Docker image build for production
 # Usage: make docker-build <image-name:=ROSA_image>
 # if you want to build with debug mode, set DOCKER_DEBUG=true
-# ex) make docker-build ROSA_image DOCKER_DEBUG=true
+# ex) make docker-build rosa_image DOCKER_DEBUG=true
 docker-build:
 	docker build \
-		-f ./infra/Dockerfile --target runtime -t $(IMAGE_NAME) \
+		-f ./infra/Dockerfile -t $(IMAGE_NAME) \
 		--build-arg GIT_HASH=$(shell git rev-parse HEAD) \
 		--build-arg IMAGE_BUILD_DATETIME=$(shell date +%Y-%m-%d_%H:%M:%S) \
 		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
