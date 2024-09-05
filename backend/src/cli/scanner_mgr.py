@@ -10,7 +10,6 @@ import httpx
 import pydantic
 import redis
 import redis.exceptions
-import src.configs as configs
 import src.models as models
 import src.redis_client as redis_client
 import src.utils.hals.readers.qrcode_serial as qrcode_serial
@@ -45,12 +44,10 @@ def qr_scanner_handler(block_path: str) -> None:
         print_exc(e)
 
 
-def scanner_manager() -> None:
+def scanner_manager(redis_dsn: str) -> None:
     global scanner_process
 
-    config_obj: configs.Config = configs.get_app_config()
-    redis_cli: redis_client.RedisClient = redis_client.RedisClient(dsn=config_obj.redis_dsn)
-
+    redis_cli: redis_client.RedisClient = redis_client.RedisClient(dsn=redis_dsn)
     with redis_cli.sync_session as redis_session:
         pubsub = redis_session.pubsub(ignore_subscribe_messages=True)
         try:
