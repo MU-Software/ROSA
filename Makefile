@@ -53,6 +53,9 @@ docker-build:
 		--build-arg IMAGE_BUILD_DATETIME=$(shell date +%Y-%m-%d_%H:%M:%S) \
 		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
 
+docker-run:
+	docker run -it --rm -p 8000:8000 -e REDIS_DSN=$(REDIS_DSN) $(IMAGE_NAME)
+
 # Server Execution
 api-local: docker-compose-up
 	@cd $(BACKEND_DIR) && poetry run python -m src --host $(HOST) --port $(PORT) --debug
