@@ -41,8 +41,7 @@ def list_usb_devices() -> list[Device]:
         for z in sp.run(args=["find", device_base_path], stdout=sp.PIPE).stdout.decode().splitlines()  # nosec B603
         if (extracted := DEV_BLK_INFO_EXTRACTOR.match(z))
         and (info := extracted.groupdict())
-        and (DeviceResult.__required_keys__ == info.keys())
-        and "root hub" not in info["name"]
+        and (DeviceResult.__required_keys__ - {"block_path"} == info.keys())
     ]
     lsusb_infos: list[LSUSBResult] = [
         info  # type: ignore[misc]
@@ -50,6 +49,7 @@ def list_usb_devices() -> list[Device]:
         if (extracted := LSUSB_INFO_EXTRACTOR.match(z))
         and (info := extracted.groupdict())
         and (LSUSBResult.__required_keys__ == info.keys())
+        and "root hub" not in info["name"]
     ]
 
     usbinfo: DeviceInfoType = cl.defaultdict(lambda: cl.defaultdict(Device))  # type: ignore[arg-type,typeddict-item]
