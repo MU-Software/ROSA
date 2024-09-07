@@ -109,7 +109,6 @@ class OrderDTO(pydantic.BaseModel):
 
 class Devices(pydantic.BaseModel):
     class USBDevice(pydantic.BaseModel):
-        id: str
         bus: int
         device: int
         block_path: str

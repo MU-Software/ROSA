@@ -24,10 +24,10 @@ class LSUSBResult(typing.TypedDict):
 
 
 class Device(typing.TypedDict):
-    id: str
     bus: str
     device: str
     block_path: str
+    usb_id: str
     name: str
 
 
@@ -37,16 +37,19 @@ DeviceInfoType = cl.defaultdict[str, cl.defaultdict[str, Device]]
 def list_usb_devices() -> list[Device]:
     device_base_path = "/dev" if platform.system() == "Darwin" else "/dev/bus/"
     dev_infos: list[DeviceResult] = [
-        info | {"path": z}  # type: ignore[misc]
+        info | {"block_path": z}  # type: ignore[misc]
         for z in sp.run(args=["find", device_base_path], stdout=sp.PIPE).stdout.decode().splitlines()  # nosec B603
         if (extracted := DEV_BLK_INFO_EXTRACTOR.match(z))
         and (info := extracted.groupdict())
+        and (DeviceResult.__required_keys__ == info.keys())
         and "root hub" not in info["name"]
     ]
     lsusb_infos: list[LSUSBResult] = [
         info  # type: ignore[misc]
         for z in sp.run(args=["lsusb"], stdout=sp.PIPE).stdout.decode().splitlines()  # nosec B603
-        if (extracted := LSUSB_INFO_EXTRACTOR.match(z)) and (info := extracted.groupdict())
+        if (extracted := LSUSB_INFO_EXTRACTOR.match(z))
+        and (info := extracted.groupdict())
+        and (LSUSBResult.__required_keys__ == info.keys())
     ]
 
     usbinfo: DeviceInfoType = cl.defaultdict(lambda: cl.defaultdict(Device))  # type: ignore[arg-type,typeddict-item]
@@ -58,7 +61,7 @@ def list_usb_devices() -> list[Device]:
     dev_list: list[Device] = []
     for bus_infos in usbinfo.values():
         for device_infos in bus_infos.values():
-            if device_infos:
+            if device_infos and Device.__required_keys__ == device_infos.keys():
                 dev_list.append(device_infos)
 
     return dev_list

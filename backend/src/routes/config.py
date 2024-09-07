@@ -50,4 +50,4 @@ async def set_devices(state: querierDI, committer: committerDI, payload: SetDevi
 async def list_possible_devices(state: querierDI) -> list[Devices.USBDevice]:
     """등록 가능한 장치 목록 조회 API"""
     registered_names: list[str] = [device.name for device in state.readers + state.printers]
-    return [Devices.USBDevice(d) for d in list_usb_devices() if d["name"] not in registered_names]
+    return [Devices.USBDevice(**d) for d in list_usb_devices() if d["name"] not in registered_names]
