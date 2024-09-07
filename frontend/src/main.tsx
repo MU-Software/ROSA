@@ -7,6 +7,7 @@ import * as R from 'remeda'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
+import { WS_DOMAIN } from './hooks/useAPIs'
 import { AppState, INITIAL_APP_SESSION_STATE } from './models'
 import { DeskScreen } from './screens/deskScreen'
 import { WelcomeScreen } from './screens/welcomeScreen'
@@ -56,7 +57,7 @@ const App: React.FC = () => {
   React.useEffect(() => {
     if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) return
 
-    websocketRef.current = new WebSocket('ws://localhost:28000/ws')
+    websocketRef.current = new WebSocket(`${WS_DOMAIN}/ws`)
     websocketRef.current.onopen = (evt) => logAndSetIsWSConnected(evt, true)
     websocketRef.current.onmessage = (evt) => setData(evt.data)
     websocketRef.current.onclose = (evt) => logAndSetIsWSConnected(evt, false)

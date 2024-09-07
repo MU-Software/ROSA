@@ -4,7 +4,8 @@ import * as R from 'remeda'
 import { APIErrorResponseType, AppState, DeskStatus, Order, OrderModifyRequest, SetDevices, USBDevice } from '../models'
 import { isAllTrue } from '../utils'
 
-const DOMAIN = import.meta.env.VITE_POCA_URL
+export const DOMAIN = import.meta.env.VITE_POCA_URL
+export const WS_DOMAIN = import.meta.env.VITE_POCA_WS_URL
 const DEFAULT_TIMEOUT = 15 * 1000 // 15 seconds
 
 export type RequestFetchMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
