@@ -58,7 +58,7 @@ docker-run:
 
 docker-run-raspi:
 	docker run \
-		-dit --rm -p 8000:8000 --privileged \
+		-dit --rm --privileged --net=host \
 		-v /dev/bus/usb:/dev/bus/usb \
 		-v /var/lib/usbutils/usb.ids:/var/lib/usbutils/usb.ids \
 		-e REDIS_DSN=$(REDIS_DSN) \
