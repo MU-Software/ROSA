@@ -16,7 +16,7 @@ import src.utils.hals.readers.qrcode_serial as qrcode_serial
 
 logger = logging.getLogger(__name__)
 processes: dict[str, mp.Process] = {}
-ERROR_MSG_DIVIDER = "==================== Error while scanning QR code ({err}) ====================\n"
+ERROR_MSG_DIVIDER = "==================== Error while scanning QR code ({}) ====================\n"
 
 
 def print_exc(e: Exception) -> None:
