@@ -29,7 +29,11 @@ def b64_to_uuid(in_str: str) -> uuid.UUID:
 
 
 def set_session_order(shortened_order_id: str) -> None:
-    httpx.put(url=f"http://localhost:28000/session/order?order_id={b64_to_uuid(shortened_order_id)}")
+    try:
+        print(f"Order ID: {b64_to_uuid(shortened_order_id)}")
+        httpx.put(url=f"http://localhost:28000/session/order?order_id={b64_to_uuid(shortened_order_id)}")
+    except Exception as e:
+        print_exc(e)
 
 
 def qr_scanner_handler(cdc_path: str) -> None:
