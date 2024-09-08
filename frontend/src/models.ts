@@ -72,12 +72,13 @@ export type USBDevice = {
   bus: number
   device: number
   block_path: string
+  cdc_path: string
   name: string
 }
 
 export type SetDevices = {
-  readers: string[]
-  printers: string[]
+  reader_names: string[]
+  printer_names: string[]
 }
 
 export type AppState = {
