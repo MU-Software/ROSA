@@ -2,6 +2,8 @@ import AutoDeleteIcon from '@mui/icons-material/AutoDelete'
 import CloseIcon from '@mui/icons-material/Close'
 import LeakAddIcon from '@mui/icons-material/LeakAdd'
 import LoopIcon from '@mui/icons-material/Loop'
+import PrintIcon from '@mui/icons-material/Print'
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner'
 import SaveIcon from '@mui/icons-material/Save'
 import {
   AppBar,
@@ -31,7 +33,7 @@ import {
 import { TransitionProps } from '@mui/material/transitions'
 import { wrap } from '@suspensive/react'
 import { MutateOptions } from '@tanstack/react-query'
-import { VariantType, useSnackbar } from 'notistack'
+import { OptionsObject, VariantType, useSnackbar } from 'notistack'
 import React from 'react'
 import * as R from 'remeda'
 
@@ -40,6 +42,7 @@ import {
   useCheckShopAPIConnectionMutation,
   useClearSessionMutation,
   useListPossibleDevicesQuery,
+  useSetDevicesConfigMutation,
   useSetShopDomainConfigMutation,
 } from '../../hooks/useAPIs'
 import { GlobalContext } from '../../main'
@@ -53,6 +56,8 @@ ConfigTransition.displayName = 'ConfigTransition'
 const TabPanel: React.FC<React.PropsWithChildren<{ value: number; index: number }>> = ({ children, value, index }) => (
   <div hidden={value !== index}>{value === index && <Box sx={{ p: 3 }}>{children}</Box>}</div>
 )
+
+const SnackBarOptionGen: (v: VariantType) => OptionsObject = (v) => ({ variant: v, anchorOrigin: { vertical: 'bottom', horizontal: 'center' } })
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
   [`& > .${tableCellClasses.root}`]: {
@@ -101,11 +106,7 @@ const DefaultConfigTab: React.FC<ConfigTabProps> = ({ index, currentTab, formRef
   const checkConnectionMutation = useCheckShopAPIConnectionMutation()
   const clearSessionMutation = useClearSessionMutation()
   const { enqueueSnackbar } = useSnackbar()
-
-  const addSnackbar = (children: string | React.ReactNode, variant: VariantType) => enqueueSnackbar(
-    children,
-    { variant, anchorOrigin: { vertical: 'bottom', horizontal: 'center' } }
-  )
+  const addSnackbar = (c: string | React.ReactNode, v: VariantType) => enqueueSnackbar(c, SnackBarOptionGen(v))
 
   const testConnection = () => {
     saveFunc({
@@ -223,13 +224,47 @@ const DefaultConfigTab: React.FC<ConfigTabProps> = ({ index, currentTab, formRef
 }
 
 const CurrentDevices: React.FC<{ devices: AppState['printers'] | AppState['readers'] }> = ({ devices }) => {
+  const { state } = React.useContext(GlobalContext)
+  const { enqueueSnackbar } = useSnackbar()
+  const addSnackbar = (c: string | React.ReactNode, v: VariantType) => enqueueSnackbar(c, SnackBarOptionGen(v))
+  const setDeviceConfigMutation = useSetDevicesConfigMutation()
+
+  const removeDevice = (name: string) => {
+    const newData = {
+      printer_names: [...state.printers.map(d => d.name)],
+      reader_names: [...state.readers.map(d => d.name)],
+    }
+    const prtIndex = newData.printer_names.findIndex(d => d === name)
+    const rdrIndex = newData.reader_names.findIndex(d => d === name)
+    if (prtIndex > -1) newData.printer_names.splice(prtIndex, 1)
+    if (rdrIndex > -1) newData.reader_names.splice(rdrIndex, 1)
+    console.log('newData', newData)
+
+    addSnackbar('장치 삭제 중...', 'info')
+    setDeviceConfigMutation.mutate(newData, {
+      onSuccess: () => addSnackbar('장치 삭제 성공', 'success'),
+      onError: () => addSnackbar('장치 삭제 실패', 'error'),
+    })
+  }
+
   return R.isArray(devices) && !R.isEmpty(devices) ? (
     devices.map((d, i) => (
       <StyledTableRowWithButton key={i}>
         <TableCell>{d.name}</TableCell>
-        <TableCell><TextField defaultValue={d.name} disabled label="장치 이름" /></TableCell>
-        <TableCell><TextField defaultValue={d.block_path} disabled label="장치 경로" /></TableCell>
-        <TableCell><Button startIcon={<CloseIcon />} variant="contained">삭제</Button></TableCell>
+        <TableCell>
+          <Box sx={{ flexGrow: '1', display: 'flex', width: '100%', flexDirection: 'row', gap: '0.5rem' }}>
+            <Box sx={{ flexGrow: '1', display: 'flex', width: '100%', flexDirection: 'column', gap: '0.5rem' }}>
+              <TextField defaultValue={d.block_path} disabled label="장치 경로 (USB)" />
+              <TextField defaultValue={d.cdc_path} disabled label="장치 경로 (CDC)" />
+            </Box>
+            <Button
+              startIcon={<CloseIcon />}
+              variant="contained"
+              onClick={() => removeDevice(d.name)}
+              disabled={setDeviceConfigMutation.isPending}
+            >삭제</Button>
+          </Box>
+        </TableCell>
       </StyledTableRowWithButton>
     ))
   ) : <StyledTableRow><TableCell colSpan={4}>등록된 장치가 없습니다.</TableCell></StyledTableRow>
@@ -247,17 +282,58 @@ const DeviceConfigTabTitleRow: React.FC<{
 
 const DeviceConfigTab: React.FC<ConfigTabProps> = ({ index, currentTab, formRef }) => {
   const { state } = React.useContext(GlobalContext)
+  const selectRef = React.useRef<HTMLSelectElement>(null)
+  const { enqueueSnackbar } = useSnackbar()
+  const addSnackbar = (c: string | React.ReactNode, v: VariantType) => enqueueSnackbar(c, SnackBarOptionGen(v))
+
   const PossibleDevices = wrap
     .ErrorBoundary({ fallback: <TableCell colSpan={2} sx={{ color: 'red' }}>추가 가능한 장치 목록을 불러오는 중 오류가 발생했습니다.</TableCell> })
     .Suspense({ fallback: <TableCell colSpan={2}><CircularProgress size="0.875rem" /></TableCell> })
     .on(() => {
       // eslint-disable-next-line react-hooks/rules-of-hooks
       const { data } = useListPossibleDevicesQuery()
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const setDeviceConfigMutation = useSetDevicesConfigMutation()
+
+      const addDevice = (deviceAs: 'printer_names' | 'reader_names') => {
+        console.log('selectRef.current', selectRef.current)
+        console.log('selectRef.current.value', selectRef.current?.value)
+        if (!selectRef.current || !(R.isString(selectRef.current.value) && !R.isEmpty(selectRef.current.value))) return
+
+        const newData = {
+          printer_names: [...state.printers.map(d => d.name)],
+          reader_names: [...state.readers.map(d => d.name)],
+        }
+        newData[deviceAs].push(selectRef.current.value)
+        console.log('newData', newData)
+
+        addSnackbar('장치 추가 중...', 'info')
+        setDeviceConfigMutation.mutate(newData, {
+          onSuccess: () => addSnackbar('장치 추가 성공', 'success'),
+          onError: () => addSnackbar('장치 추가 실패', 'error'),
+        })
+      }
 
       return R.isArray(data) && !R.isEmpty(data) ? (
         <>
           <TableCell>추가 가능한 장치</TableCell>
-          <TableCell><Select>{data.map((r, i) => <MenuItem key={i} value={r.name}>{r.name}</MenuItem>)}</Select></TableCell>
+          <TableCell>
+            <Box sx={{ width: '100%', display: 'flex', gap: '1rem' }}>
+              <Select sx={{ flexGrow: '1' }} inputRef={selectRef}>
+                {data.map((r, i) => <MenuItem key={i} value={r.name}>{r.name}</MenuItem>)}
+              </Select>
+              <Button
+                startIcon={<QrCodeScannerIcon />}
+                onClick={() => addDevice('reader_names')}
+                disabled={setDeviceConfigMutation.isPending}
+              >리더기 추가</Button>
+              <Button
+                startIcon={<PrintIcon />}
+                onClick={() => addDevice('printer_names')}
+                disabled={setDeviceConfigMutation.isPending}
+              >프린터 추가</Button>
+            </Box>
+          </TableCell>
         </>
       ) : <TableCell colSpan={2}>추가 가능한 장치가 없습니다.</TableCell>
     })
@@ -268,7 +344,7 @@ const DeviceConfigTab: React.FC<ConfigTabProps> = ({ index, currentTab, formRef 
         <Stack spacing={2}>
           <TableContainer>
             <Table>
-              <TableHead><DeviceConfigTabTitleRow colSpan={2} variant="h5" title="바코드 리더 설정" /></TableHead>
+              <TableHead><DeviceConfigTabTitleRow colSpan={2} variant="h5" title="장치 설정" /></TableHead>
               <TableBody><StyledTableRow><PossibleDevices /></StyledTableRow></TableBody>
             </Table>
           </TableContainer>
@@ -297,11 +373,7 @@ export const ConfigDialog: React.FC = () => {
   const [tabIndex, setTabIndex] = React.useState(0)
   const setSessionConfigMutation = useSetShopDomainConfigMutation()
   const { enqueueSnackbar } = useSnackbar()
-
-  const addSnackbar = (children: string | React.ReactNode, variant: VariantType) => enqueueSnackbar(
-    children,
-    { variant, anchorOrigin: { vertical: 'bottom', horizontal: 'center' } }
-  )
+  const addSnackbar = (c: string | React.ReactNode, v: VariantType) => enqueueSnackbar(c, SnackBarOptionGen(v))
 
   const saveFunc = (option: MutateOptions<AppState, Error, AppState['shop_api'], unknown>) => {
     if (!isFormValid(defaultConfigFormRef.current)) return
