@@ -1,4 +1,5 @@
 import http
+import io
 import pathlib
 
 import fastapi
@@ -51,23 +52,22 @@ async def print_label(state: querierDI, browser: browserDI) -> AppState:
 
     # TODO: FIXME: 지금이야 단건 주문만 가능하지만, 만약 여러 상품을 한번에 주문할 수 있는 경우 수정 필요
     ticket_opr: OrderDTO.OrderProductRelationDTO = state.order.products[0]
-    context = {
-        "user_name": ticket_opr.get_option_by_name("성함") or "",
-        "user_org": ticket_opr.get_option_by_name("소속") or "",
-        "qrcode_data": state.order.id,
+    ctx = {
+        "user_name": ticket_opr.get_option_by_name("성함").custom_response or "",
+        "user_org": ticket_opr.get_option_by_name("소속").custom_response or "",
+        "qrcode_data": str(state.order.id),
     }
-    image: bytes = await html_renderer.render_html(
-        browser=browser, template=TEMPLATE, context=context, element="#container"
-    )
+    image = await html_renderer.render_html(browser=browser, template=TEMPLATE, context=ctx, element="#container")
     image = html_renderer.image_to_bw(image=image)
+    with io.BytesIO(image) as image_io:
+        with PIL.Image.open(image_io) as img:
+            tspl = TSPL(size=(80, 40), gap=3)
+            with tspl as printer:
+                with printer.page as page:
+                    with page.image_buffer as img_buf:
+                        img_buf.write(image=img)
 
-    tspl = TSPL()
-    with tspl as printer:
-        with printer.page as page:
-            with page.image_buffer as img_buf:
-                img_buf.write(image=PIL.Image.frombytes(data=image))
-
-    # TODO: FIXME: 실제 프린터로 출력하는 코드 작성해야 함
-    # tspl.print()
+            for printer in state.printers:
+                tspl.print(printer.cdc_path)
 
     return state
