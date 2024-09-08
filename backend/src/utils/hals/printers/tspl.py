@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+import pathlib
 import re
 import types
 import typing
 
-import cv2
 import numpy as np
 import PIL.Image
 import pydantic
-import serial
 
 ContextExitArgType = tuple[type[BaseException], BaseException, typing.Optional[types.TracebackType]]
 PrinterDetectMode = typing.Literal[b"AUTO", b"GAP", b"BLINE"] | None
@@ -35,7 +34,7 @@ class TSPL(pydantic.BaseModel):
     TSPL Script Generator
 
     Usage:
-        tspl = TSPL(...)  # or TSPL.detect(printer_serial)
+        tspl = TSPL(...)
         with tspl as printer:
             with printer.page as page:
                 with page.image_buffer as img_buf:
@@ -72,35 +71,20 @@ class TSPL(pydantic.BaseModel):
             return []
 
         def write(self, image: PIL.Image.Image) -> None:
-            rot_img = image.rotate(90, expand=True)
-            bw_rot_img = rot_img.convert("1")
-            gs_rot_img = rot_img.convert("L")
-            img_arr = np.array(gs_rot_img)
+            bw_img = image.convert("1")
+            bit_arr_str = "".join(map(str, np.array(bw_img, dtype=int).flatten(order="c")))
+            img_hex_num_str = b"".join(
+                map(lambda x: int(x, 2).to_bytes(length=1, byteorder="little"), BIT_8_CUTTER.findall(bit_arr_str))
+            )
 
-            blur = cv2.GaussianBlur(img_arr, (BLUR_KERNEL_SIZE, BLUR_KERNEL_SIZE), 0)
-            blurred_inv_thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-            inv_thresh = cv2.threshold(img_arr, 0, 255, cv2.THRESH_BINARY_INV)[1]
-            threshold = np.add(inv_thresh, blurred_inv_thresh)
-
-            if cv2.__version__.startswith("4"):
-                contours, _ = cv2.findContours(threshold, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            elif cv2.__version__.startswith("3"):
-                _, contours, _ = cv2.findContours(threshold, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            for contour in contours:
-                # left, top, width, height
-                x, y, w, h = align_to_pixelperfect(*cv2.boundingRect(contour))
-                cropped_image = bw_rot_img.crop((x, y, x + w, y + h))
-                bit_arr_str = "".join(map(str, np.array(cropped_image, dtype=int).flatten(order="c")))
-                img_hex_num_str = b"".join(
-                    map(lambda x: int(x, 2).to_bytes(length=1, byteorder="little"), BIT_8_CUTTER.findall(bit_arr_str))
-                )
-                # BITMAP x, y, width, height, mode, bitmap data
-                # mode:
-                #   0: overwrite
-                #   1: OR
-                #   2: XOR
-                self.tspl_context.cmdlist.append(f"BITMAP {x},{y},{int(w / 8)},{h},0,".encode() + img_hex_num_str)
+            # BITMAP x, y, width, height, mode, bitmap data
+            # mode:
+            #   0: overwrite
+            #   1: OR
+            #   2: XOR
+            self.tspl_context.cmdlist.append(
+                f"BITMAP 0,0,{int(bw_img.size[0] / 8)},{bw_img.size[1]},0,".encode() + img_hex_num_str
+            )
 
     class Page(TSPLCommandContextManager, pydantic.BaseModel):
         def build_enter_cmds(self) -> list[bytes]:
@@ -109,6 +93,8 @@ class TSPL(pydantic.BaseModel):
                 f"GAP {self.tspl_context.gap} mm, 0 mm".encode(),
                 f"OFFSET {self.tspl_context.offset} mm".encode(),
                 f"DIRECTION {0 if self.tspl_context.direction == 'FORWARD' else 1}".encode(),
+                f"SPEED {self.tspl_context.speed}".encode() if self.tspl_context.speed else b"",
+                f"DENSITY {self.tspl_context.density}".encode(),
             ]
 
         def build_exit_cmds(self) -> list[bytes]:
@@ -118,17 +104,16 @@ class TSPL(pydantic.BaseModel):
         def image_buffer(self) -> TSPL.ImageBuffer:
             return TSPL.ImageBuffer(tspl_context=self.tspl_context)
 
-    printer: serial.Serial | None = None
     cmdlist: list[bytes] = pydantic.Field(default_factory=list)
 
     size: tuple[float, float]  # in mm
-    gap: int  # in mm, currently only support normal gap
+    gap: int = 0  # in mm, currently only support normal gap
     offset: float = 0  # in mm
 
     speed: str | None = None  # Print speed in inch per second. (I hate this imperial unit)
     density: int = pydantic.Field(default=7, ge=0, le=15)
 
-    direction: typing.Literal[b"FORWARD", b"BACKWARD"] = b"FORWARD"
+    direction: typing.Literal["FORWARD", "BACKWARD"] = "FORWARD"
     mirror: bool = False
 
     auto_detect: bool = False
@@ -141,19 +126,6 @@ class TSPL(pydantic.BaseModel):
     def page(self) -> TSPL.Page:
         return self.Page(tspl_context=self)
 
-    # @classmethod
-    # def detect(cls, printer: serial.Serial, **kwargs) -> TSPL:
-    #     printer.write("QUERY SENSOR\n".encode())
-    #     response = printer.readline().decode()
-
-    #     return cls(
-    #         printer=printer,
-    #         auto_detect="AUTO" in response,
-    #         gap_detect="GAP" in response,
-    #         bline_detect="BLINE" in response,
-    #         **kwargs,
-    #     )
-
     def __enter__(self) -> typing.Self:
         INITIAL_CMD = [b"INITIALPRINTER"]
         self.cmdlist.extend(INITIAL_CMD)
@@ -164,3 +136,9 @@ class TSPL(pydantic.BaseModel):
         INITIAL_END_CMD = [b"PRINT 1", b"END"]
         self.cmdlist.extend(INITIAL_END_CMD)
         pass
+
+    def print(self, cdc_path: str) -> None:
+        if not (dev := pathlib.Path(cdc_path)).exists():
+            raise FileNotFoundError(f"Device {dev} not found")
+
+        dev.write_bytes(b"\r\n".join(self.cmdlist) + b"\r\n")
