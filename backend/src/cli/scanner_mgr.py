@@ -15,13 +15,12 @@ import src.redis_client as redis_client
 import src.utils.hals.readers.qrcode_serial as qrcode_serial
 
 logger = logging.getLogger(__name__)
-scanner_process: mp.Process | None = None
+scanner_processes: list[mp.Process] = []
 ERROR_MSG_DIVIDER = "==================== Error while scanning QR code ({err}) ====================\n"
 
 
 def print_exc(e: Exception) -> None:
-    traceback_msg = traceback.format_exception(e)
-    logger.warning(f"{ERROR_MSG_DIVIDER.format(e.__class__.__name__)}{traceback_msg}")
+    logger.warning(f"{ERROR_MSG_DIVIDER.format(e.__class__.__name__)}{traceback.format_exception(e)}")
 
 
 def b64_to_uuid(in_str: str) -> uuid.UUID:
@@ -37,16 +36,11 @@ def qr_scanner_handler(block_path: str) -> None:
     try:
         device = qrcode_serial.SerialInfo(port=block_path)
         device.retrieve_and_exec(callback=set_session_order)
-    except qrcode_serial.SerialInfoError as e:
-        print_exc(e)
-
     except Exception as e:
         print_exc(e)
 
 
 def scanner_manager(redis_dsn: str) -> None:
-    global scanner_process
-
     redis_cli: redis_client.RedisClient = redis_client.RedisClient(dsn=redis_dsn)
     with redis_cli.sync_session as redis_session:
         pubsub = redis_session.pubsub(ignore_subscribe_messages=True)
@@ -69,13 +63,14 @@ def scanner_manager(redis_dsn: str) -> None:
                     continue
 
                 prev_msg = msg
-                if scanner_process and scanner_process.is_alive():
-                    scanner_process.terminate()
-                    scanner_process.join()
+                for scanner_process in scanner_processes:
+                    if scanner_process.is_alive():
+                        scanner_process.join()
+                        scanner_processes.remove(scanner_process)
 
-                if reader := msg.reader:
-                    scanner_process = mp.Process(target=qr_scanner_handler, args=(reader.block_path,))
-                    scanner_process.start()
+                for reader in msg.readers:
+                    scanner_processes.append(mp.Process(target=qr_scanner_handler, args=(reader.cdc_path,)))
+                    scanner_processes[-1].start()
         except redis.exceptions.ConnectionError as e:
             print(f"Redis connection error: {e}")
         finally:
