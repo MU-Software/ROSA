@@ -15,7 +15,7 @@ import src.redis_client as redis_client
 import src.utils.hals.readers.qrcode_serial as qrcode_serial
 
 logger = logging.getLogger(__name__)
-scanner_processes: list[mp.Process] = []
+processes: dict[str, mp.Process] = {}
 ERROR_MSG_DIVIDER = "==================== Error while scanning QR code ({err}) ====================\n"
 
 
@@ -63,14 +63,15 @@ def scanner_manager(redis_dsn: str) -> None:
                     continue
 
                 prev_msg = msg
-                for scanner_process in scanner_processes:
-                    if scanner_process.is_alive():
-                        scanner_process.join()
-                        scanner_processes.remove(scanner_process)
+                for cdc_path, process in processes.items():
+                    if cdc_path not in [d.cdc_path for d in msg.readers] and process.is_alive():
+                        process.join()
+                        del processes[cdc_path]
 
                 for reader in msg.readers:
-                    scanner_processes.append(mp.Process(target=qr_scanner_handler, args=(reader.cdc_path,)))
-                    scanner_processes[-1].start()
+                    if reader.cdc_path not in processes:
+                        processes[reader.cdc_path] = mp.Process(target=qr_scanner_handler, args=(reader.cdc_path,))
+                        processes[reader.cdc_path].start()
         except redis.exceptions.ConnectionError as e:
             print(f"Redis connection error: {e}")
         finally:
