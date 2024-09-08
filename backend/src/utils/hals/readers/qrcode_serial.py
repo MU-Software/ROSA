@@ -26,10 +26,11 @@ class SerialInfo(pydantic.BaseModel):
         collected_data: str = ""
 
         try:
-            while read_data := self.serial.read():
-                collected_data += read_data.decode()
-                if collected_data.endswith(("\n", "\r")):
-                    callback(collected_data)
-                    collected_data = ""
+            with self.serial as serial_device:
+                while read_data := serial_device.read():
+                    collected_data += read_data.decode()
+                    if collected_data.endswith(("\n", "\r", "\0")):
+                        callback(collected_data)
+                        collected_data = ""
         except serial.SerialException as e:
             raise SerialInfoError(f"Error while reading data from serial port: {e}") from e
