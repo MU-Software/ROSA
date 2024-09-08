@@ -13,9 +13,9 @@ class SerialInfoError(serial.SerialException):
 class SerialInfo(pydantic.BaseModel):
     port: str
     baudrate: int = 115200
-    bytesize: int = 8
-    parity: ParityType = "N"
-    stopbits: int = 1
+    bytesize: int = serial.EIGHTBITS
+    parity: ParityType = serial.PARITY_NONE
+    stopbits: int = serial.STOPBITS_ONE
     timeout: int | None = None
 
     @property
