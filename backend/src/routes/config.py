@@ -30,12 +30,12 @@ class SetDeviceRequestDTO(pydantic.BaseModel):
     @pydantic.computed_field  # type: ignore[misc]
     @property
     def printers(self) -> list[Devices.USBDevice]:
-        return [Devices.USBDevice(d) for d in retrieve_usb_devices(self.printer_names)]
+        return [Devices.USBDevice(**d) for d in retrieve_usb_devices(self.printer_names)]
 
     @pydantic.computed_field  # type: ignore[misc]
     @property
     def readers(self) -> list[Devices.USBDevice]:
-        return [Devices.USBDevice(d) for d in retrieve_usb_devices(self.reader_names)]
+        return [Devices.USBDevice(**d) for d in retrieve_usb_devices(self.reader_names)]
 
 
 @router.put(path="/devices")
