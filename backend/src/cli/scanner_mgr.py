@@ -32,9 +32,9 @@ def set_session_order(shortened_order_id: str) -> None:
     httpx.put(url=f"http://localhost:28000/session/order?order_id={b64_to_uuid(shortened_order_id)}")
 
 
-def qr_scanner_handler(block_path: str) -> None:
+def qr_scanner_handler(cdc_path: str) -> None:
     try:
-        device = qrcode_serial.SerialInfo(port=block_path)
+        device = qrcode_serial.SerialInfo(port=cdc_path)
         device.retrieve_and_exec(callback=set_session_order)
     except Exception as e:
         print_exc(e)
