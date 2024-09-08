@@ -56,11 +56,17 @@ docker-build:
 docker-run:
 	docker run -dit --rm -p 8000:8000 -e REDIS_DSN=$(REDIS_DSN) $(IMAGE_NAME)
 
+# Docker runner for Raspberry Pi
+# --privileged is required for USB device access,
+# /dev is required for USB device access,
+# /var/lib/usbutils/usb.ids is required for lsusb,
+# /run/udev is required for udevadm
 docker-run-raspi:
 	docker run \
 		-dit --rm --privileged --net=host \
-		-v /dev/bus/usb:/dev/bus/usb \
+		-v /dev:/dev \
 		-v /var/lib/usbutils/usb.ids:/var/lib/usbutils/usb.ids \
+		-v /run/udev:/run/udev:ro \
 		-e REDIS_DSN=$(REDIS_DSN) \
 		$(IMAGE_NAME)
 
