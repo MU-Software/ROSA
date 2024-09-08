@@ -20,7 +20,7 @@ ERROR_MSG_DIVIDER = "==================== Error while scanning QR code ({}) ====
 
 
 def print_exc(e: Exception) -> None:
-    logger.warning(f"{ERROR_MSG_DIVIDER.format(e.__class__.__name__)}{traceback.format_exception(e)}")
+    logger.warning(f"{ERROR_MSG_DIVIDER.format(e.__class__.__name__)}{''.join(traceback.format_exception(e))}")
 
 
 def b64_to_uuid(in_str: str) -> uuid.UUID:
