@@ -112,6 +112,7 @@ class Devices(pydantic.BaseModel):
         bus: int
         device: int
         block_path: str
+        cdc_path: str
         name: str
 
     readers: list[USBDevice] = pydantic.Field(default_factory=list)
