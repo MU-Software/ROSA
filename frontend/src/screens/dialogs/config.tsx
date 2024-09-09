@@ -5,13 +5,13 @@ import LoopIcon from '@mui/icons-material/Loop'
 import PrintIcon from '@mui/icons-material/Print'
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner'
 import SaveIcon from '@mui/icons-material/Save'
+import SettingsIcon from '@mui/icons-material/Settings'
 import {
   AppBar,
   Box,
   Button,
   CircularProgress,
   Dialog,
-  IconButton,
   MenuItem,
   Select,
   Slide,
@@ -28,7 +28,7 @@ import {
   Toolbar,
   Typography,
   styled,
-  tableCellClasses,
+  tableCellClasses
 } from '@mui/material'
 import { TransitionProps } from '@mui/material/transitions'
 import { wrap } from '@suspensive/react'
@@ -376,33 +376,33 @@ export const ConfigDialog: React.FC = () => {
   const addSnackbar = (c: string | React.ReactNode, v: VariantType) => enqueueSnackbar(c, SnackBarOptionGen(v))
 
   const saveFunc = (option: MutateOptions<AppState, Error, AppState['shop_api'], unknown>) => {
-    if (!isFormValid(defaultConfigFormRef.current)) return
-
-    const formData = getFormValue<AppState['shop_api']>({ form: defaultConfigFormRef.current })
-    addSnackbar('설정 저장 중...', 'info')
-    // TODO: FIXME: 저장 후 defaultValue 값을 서버의 값으로 초기화해야 함.
-    setSessionConfigMutation.mutate(formData, {
-      ...option,
-      onSuccess: (d, v, c) => {
-        addSnackbar('설정 저장 성공', 'success')
-        option.onSuccess?.(d, v, c)
-      },
-      onError: (e, v, c) => {
-        addSnackbar('설정 저장 실패', 'error')
-        option.onError?.(e, v, c)
-      },
-    })
+    if (isFormValid(defaultConfigFormRef.current)) {
+      const formData = getFormValue<AppState['shop_api']>({ form: defaultConfigFormRef.current })
+      addSnackbar('설정 저장 중...', 'info')
+      // TODO: FIXME: 저장 후 defaultValue 값을 서버의 값으로 초기화해야 함.
+      setSessionConfigMutation.mutate(formData, {
+        ...option,
+        onSuccess: (d, v, c) => {
+          addSnackbar('설정 저장 성공', 'success')
+          option.onSuccess?.(d, v, c)
+        },
+        onError: (e, v, c) => {
+          addSnackbar('설정 저장 실패', 'error')
+          option.onError?.(e, v, c)
+        },
+      })
+    } else {
+      closeDialog()
+    }
   }
-  const saveAndClose = () => saveFunc({ onSuccess: closeDialog })
 
   return (
     <Dialog TransitionComponent={ConfigTransition} disableEscapeKeyDown fullScreen open={dialogMode === 'config'}>
       <AppBar>
         <Toolbar>
-          {/* X 버튼을 누를 시, 내용이 수정된 경우 저장하겠냐는 팝업을 띄워야 함 */}
-          <IconButton color="inherit" edge="start" onClick={saveAndClose}><CloseIcon /></IconButton>
+          <SettingsIcon />
           <Typography component="div" sx={{ ml: 2, flex: 1 }} variant="h6">설정</Typography>
-          <Button autoFocus color="inherit" onClick={saveAndClose} startIcon={<SaveIcon />}>저장</Button>
+          <Button autoFocus color="inherit" onClick={() => saveFunc({ onSuccess: closeDialog })} startIcon={<SaveIcon />}>저장</Button>
         </Toolbar>
       </AppBar>
       <Toolbar />
