@@ -26,6 +26,7 @@ import {
   alpha,
   styled,
 } from '@mui/material'
+import { blue } from '@mui/material/colors'
 import { SnackbarProvider } from 'notistack'
 import React from 'react'
 import { Route, Routes, useNavigate } from 'react-router-dom'
@@ -62,6 +63,11 @@ const PageInnerContainer = styled(Box)(({ theme }) => ({
   height: 'fit-content',
   minHeight: '100%',
   backgroundColor: theme.palette.grey[200],
+}))
+
+const GradientAppBar = styled(AppBar)(() => ({
+  // background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
+  background: `linear-gradient(15deg, ${blue[600]} 10%, ${blue[900]} 90%)`,
 }))
 
 const Search = styled('div')(({ theme }) => ({
@@ -201,7 +207,7 @@ const WrappedDeskScreen: React.FC = () => {
     <Box sx={{ height: '100%' }}>
       <CssBaseline />
 
-      <AppBar component="nav">
+      <GradientAppBar>
         <Toolbar sx={{ justifyContent: 'space-between', gap: '1rem' }}>
           <Typography component="div" variant="h6">
             <a href="/" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bolder' }}>ROSA</a>
@@ -257,7 +263,7 @@ const WrappedDeskScreen: React.FC = () => {
             </a>
           </Tooltip>
         </Toolbar>
-      </AppBar>
+      </GradientAppBar>
 
       <Box component="main" sx={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%' }}>
         <Drawer
