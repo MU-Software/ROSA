@@ -1,10 +1,8 @@
-import base64
 import contextlib
 import logging
 import multiprocessing as mp
 import traceback
 import typing
-import uuid
 
 import httpx
 import pydantic
@@ -13,6 +11,7 @@ import redis.exceptions
 import src.models as models
 import src.redis_client as redis_client
 import src.utils.hals.readers.qrcode_serial as qrcode_serial
+import src.utils.stdlibs.str_utils as str_utils
 
 logger = logging.getLogger(__name__)
 processes: dict[str, mp.Process] = {}
@@ -23,15 +22,10 @@ def print_exc(e: Exception) -> None:
     logger.warning(f"{ERROR_MSG_DIVIDER.format(e.__class__.__name__)}{''.join(traceback.format_exception(e))}")
 
 
-def b64_to_uuid(in_str: str) -> uuid.UUID:
-    in_str += "=" * (4 - len(in_str) % 4)
-    return uuid.UUID(bytes=base64.urlsafe_b64decode(in_str + "=="))
-
-
 def set_session_order(shortened_order_id: str) -> None:
     try:
-        print(f"Order ID: {b64_to_uuid(shortened_order_id)}")
-        httpx.put(url=f"http://localhost:28000/session/order?order_id={b64_to_uuid(shortened_order_id)}")
+        print(f"Order ID: {str_utils.b64_to_uuid(shortened_order_id)}")
+        httpx.put(url=f"http://localhost:28000/session/order?order_id={str_utils.b64_to_uuid(shortened_order_id)}")
     except Exception as e:
         print_exc(e)
 

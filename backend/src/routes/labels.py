@@ -4,15 +4,33 @@ import pathlib
 
 import fastapi
 import PIL.Image
+import playwright.async_api
 from src.dependencies import browserDI, querierDI
 from src.models import AppState, OrderDTO
 from src.utils.hals.printers.tspl import TSPL
 from src.utils.renderers import html_renderer
+from src.utils.stdlibs.str_utils import uuid_to_b64
 
 TEMPLATE_PATH = pathlib.Path("src/templates/label.html")
 TEMPLATE: str = TEMPLATE_PATH.read_text()
 
 router = fastapi.APIRouter(prefix="/label")
+
+
+def _get_render_context_from_order(order: OrderDTO) -> dict[str, str]:
+    # TODO: FIXME: 지금이야 단건 주문만 가능하지만, 만약 여러 상품을 한번에 주문할 수 있는 경우 수정 필요
+    ticket_opr: OrderDTO.OrderProductRelationDTO = order.products[0]
+    return {
+        "user_name": ticket_opr.get_option_by_name("성함").custom_response or "",
+        "user_org": ticket_opr.get_option_by_name("소속").custom_response or "",
+        "qrcode_data": uuid_to_b64(order.id),
+    }
+
+
+async def _get_rendered_image_from_order(order: OrderDTO, browser: playwright.async_api.Browser) -> bytes:
+    ctx: dict[str, str] = _get_render_context_from_order(order)
+    img: bytes = await html_renderer.render_html(browser=browser, template=TEMPLATE, context=ctx, element="#container")
+    return html_renderer.image_to_bw(image=img)
 
 
 @router.get(
@@ -30,18 +48,7 @@ router = fastapi.APIRouter(prefix="/label")
 async def preview_label(state: querierDI, browser: browserDI) -> fastapi.responses.Response:
     """라벨 출력 미리보기 API"""
     state.check_order_available()
-
-    # TODO: FIXME: 지금이야 단건 주문만 가능하지만, 만약 여러 상품을 한번에 주문할 수 있는 경우 수정 필요
-    ticket_opr: OrderDTO.OrderProductRelationDTO = state.order.products[0]
-    context = {
-        "user_name": ticket_opr.get_option_by_name("성함").custom_response or "",
-        "user_org": ticket_opr.get_option_by_name("소속").custom_response or "",
-        "qrcode_data": str(state.order.id),
-    }
-    image: bytes = await html_renderer.render_html(
-        browser=browser, template=TEMPLATE, context=context, element="#container"
-    )
-    image = html_renderer.image_to_bw(image=image)
+    image: bytes = await _get_rendered_image_from_order(order=state.order, browser=browser)
     return fastapi.responses.Response(content=image, media_type="image/png")
 
 
@@ -49,16 +56,7 @@ async def preview_label(state: querierDI, browser: browserDI) -> fastapi.respons
 async def print_label(state: querierDI, browser: browserDI) -> AppState:
     """라벨 출력 API"""
     state.check_order_available()
-
-    # TODO: FIXME: 지금이야 단건 주문만 가능하지만, 만약 여러 상품을 한번에 주문할 수 있는 경우 수정 필요
-    ticket_opr: OrderDTO.OrderProductRelationDTO = state.order.products[0]
-    ctx = {
-        "user_name": ticket_opr.get_option_by_name("성함").custom_response or "",
-        "user_org": ticket_opr.get_option_by_name("소속").custom_response or "",
-        "qrcode_data": str(state.order.id),
-    }
-    image = await html_renderer.render_html(browser=browser, template=TEMPLATE, context=ctx, element="#container")
-    image = html_renderer.image_to_bw(image=image)
+    image: bytes = await _get_rendered_image_from_order(order=state.order, browser=browser)
     with io.BytesIO(image) as image_io:
         with PIL.Image.open(image_io) as img:
             tspl = TSPL(size=(80, 40), gap=3)
