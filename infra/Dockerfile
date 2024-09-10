@@ -36,7 +36,7 @@ ENV TZ=Asia/Seoul \
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && apt-get update \
-    && apt-get install -y --no-install-recommends curl wget ca-certificates gnupg lsb-release \
+    && apt-get install -y --no-install-recommends curl wget ca-certificates gnupg lsb-release usbutils udev \
     && apt-get autoremove -y \
     && apt-get autoclean -y \
     && apt-get clean -y \
