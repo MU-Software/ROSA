@@ -41,8 +41,10 @@ class SetDeviceRequestDTO(pydantic.BaseModel):
 @router.put(path="/devices")
 async def set_devices(state: querierDI, committer: committerDI, payload: SetDeviceRequestDTO) -> AppState:
     """장치 정보 설정 API"""
-    state.readers = payload.readers or state.readers
-    state.printers = payload.printers or state.printers
+    if payload.readers:
+        state.readers = payload.readers
+    if payload.printers:
+        state.printers = payload.printers
     return await committer(state)
 
 
