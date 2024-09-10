@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import logging
 import multiprocessing as mp
 import traceback
@@ -22,28 +23,30 @@ def print_exc(e: Exception) -> None:
     logger.warning(f"{ERROR_MSG_DIVIDER.format(e.__class__.__name__)}{''.join(traceback.format_exception(e))}")
 
 
-def set_session_order(shortened_order_id: str) -> None:
+def set_session_order(shortened_order_id: str, port: int) -> None:
     try:
         order_id = shortened_order_id
         if not str_utils.UUID_REGEX.match(shortened_order_id):
             order_id = str_utils.b64_to_uuid(shortened_order_id)
 
         print(f"Order ID: {order_id}")
-        httpx.put(url=f"http://localhost:28000/session/order?order_id={order_id}")
+        httpx.put(url=f"http://localhost:{port}/session/order?order_id={order_id}")
     except Exception as e:
         print_exc(e)
 
 
-def qr_scanner_handler(usb_dev: models.Devices.USBDevice) -> None:
+def qr_scanner_handler(usb_dev: models.Devices.USBDevice, port: int) -> None:
     try:
-        qrcode_serial.SerialInfo(port=usb_dev.cdc_path).retrieve_and_exec(callback=set_session_order)
+        callback = functools.partial(set_session_order, port=port)
+        device = qrcode_serial.SerialInfo(port=usb_dev.cdc_path)
+        device.retrieve_and_exec(callback=callback)
     except KeyboardInterrupt:
         pass
     except Exception as e:
         print_exc(e)
 
 
-def scanner_manager(redis_dsn: str) -> None:
+def scanner_manager(redis_dsn: str, port: int = 8000) -> None:
     redis_cli: redis_client.RedisClient = redis_client.RedisClient(dsn=redis_dsn)
     with redis_cli.sync_session as redis_session:
         pubsub = redis_session.pubsub(ignore_subscribe_messages=True)
@@ -74,7 +77,7 @@ def scanner_manager(redis_dsn: str) -> None:
 
                 for reader in msg.readers:
                     if reader not in processes:
-                        processes[reader] = mp.Process(target=qr_scanner_handler, args=(reader,))
+                        processes[reader] = mp.Process(target=qr_scanner_handler, args=(reader, port))
                         processes[reader].start()
 
                 for reader, process in processes.items():

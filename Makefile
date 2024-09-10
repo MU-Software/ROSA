@@ -76,7 +76,7 @@ docker-cmd-raspi:
 		-v /dev:/dev \
 		-v /var/lib/usbutils/usb.ids:/var/lib/usbutils/usb.ids \
 		-v /run/udev:/run/udev:ro \
-		$(IMAGE_NAME) /bin/bash -c "python -m src.cli $(REDIS_DSN)"
+		$(IMAGE_NAME) python -m src.cli --redis-dsn=$(REDIS_DSN) --port=8000
 
 # Server Execution
 api-local: docker-compose-up
