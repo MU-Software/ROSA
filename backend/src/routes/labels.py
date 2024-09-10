@@ -1,12 +1,14 @@
 import http
 import io
+import logging
 import pathlib
+import traceback
 
 import fastapi
 import PIL.Image
 import playwright.async_api
-from src.dependencies import browserDI, querierDI
-from src.models import AppState, OrderDTO
+from src.dependencies import browserDI, committerDI, querierDI
+from src.models import AppState, Devices, OrderDTO
 from src.utils.hals.printers.tspl import TSPL
 from src.utils.renderers import html_renderer
 from src.utils.stdlibs.str_utils import uuid_to_b64
@@ -14,6 +16,7 @@ from src.utils.stdlibs.str_utils import uuid_to_b64
 TEMPLATE_PATH = pathlib.Path("src/templates/label.html")
 TEMPLATE: str = TEMPLATE_PATH.read_text()
 
+logger = logging.getLogger(__name__)
 router = fastapi.APIRouter(prefix="/label")
 
 
@@ -53,7 +56,7 @@ async def preview_label(state: querierDI, browser: browserDI) -> fastapi.respons
 
 
 @router.post(path="/print")
-async def print_label(state: querierDI, browser: browserDI) -> AppState:
+async def print_label(state: querierDI, committer: committerDI, browser: browserDI) -> AppState:
     """라벨 출력 API"""
     state.check_order_available()
     image: bytes = await _get_rendered_image_from_order(order=state.order, browser=browser)
@@ -65,7 +68,13 @@ async def print_label(state: querierDI, browser: browserDI) -> AppState:
                     with page.image_buffer as img_buf:
                         img_buf.write(image=img)
 
+            printer_list: list[Devices.USBDevice] = state.printers.copy()
             for printer in state.printers:
-                tspl.print(printer.cdc_path)
+                try:
+                    tspl.print(printer.cdc_path)
+                except Exception as e:
+                    printer_list.remove(printer)
+                    logger.error("Failed to print label:\n", traceback.format_exception(e))
+            state.printers = printer_list
 
-    return state
+    return committer(state)

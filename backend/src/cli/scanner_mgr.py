@@ -14,7 +14,7 @@ import src.utils.hals.readers.qrcode_serial as qrcode_serial
 import src.utils.stdlibs.str_utils as str_utils
 
 logger = logging.getLogger(__name__)
-processes: dict[str, mp.Process] = {}
+processes: dict[models.Devices.USBDevice, mp.Process] = {}
 ERROR_MSG_DIVIDER = "==================== Error while scanning QR code ({}) ====================\n"
 
 
@@ -30,10 +30,11 @@ def set_session_order(shortened_order_id: str) -> None:
         print_exc(e)
 
 
-def qr_scanner_handler(cdc_path: str) -> None:
+def qr_scanner_handler(usb_dev: models.Devices.USBDevice) -> None:
     try:
-        device = qrcode_serial.SerialInfo(port=cdc_path)
-        device.retrieve_and_exec(callback=set_session_order)
+        qrcode_serial.SerialInfo(port=usb_dev.cdc_path).retrieve_and_exec(callback=set_session_order)
+    except KeyboardInterrupt:
+        pass
     except Exception as e:
         print_exc(e)
 
@@ -61,17 +62,27 @@ def scanner_manager(redis_dsn: str) -> None:
                     continue
 
                 prev_msg = msg
-                for cdc_path, process in processes.items():
-                    if cdc_path not in [d.cdc_path for d in msg.readers] and process.is_alive():
-                        process.join()
-                        del processes[cdc_path]
+                for reader, process in processes.items():
+                    if reader not in msg.readers:
+                        if process.is_alive():
+                            process.terminate()
+                        del processes[reader]
 
                 for reader in msg.readers:
-                    if reader.cdc_path not in processes:
-                        processes[reader.cdc_path] = mp.Process(target=qr_scanner_handler, args=(reader.cdc_path,))
-                        processes[reader.cdc_path].start()
+                    if reader not in processes:
+                        processes[reader] = mp.Process(target=qr_scanner_handler, args=(reader,))
+                        processes[reader].start()
+
+                for reader, process in processes.items():
+                    if not process.is_alive():
+                        del processes[reader]
+                        msg.readers.remove(reader)
+                        redis_session.set(redis_client.RedisKey.PUBSUB_CHANNEL, msg.model_dump())
         except redis.exceptions.ConnectionError as e:
             print(f"Redis connection error: {e}")
+        except KeyboardInterrupt:
+            for process in processes.values():
+                process.terminate()
         finally:
             pubsub.unsubscribe(redis_client.RedisKey.PUBSUB_CHANNEL)
 

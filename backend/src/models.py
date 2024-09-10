@@ -115,6 +115,8 @@ class Devices(pydantic.BaseModel):
         cdc_path: str
         name: str
 
+        model_config = pydantic.ConfigDict(frozen=True)
+
     readers: list[USBDevice] = pydantic.Field(default_factory=list)
     printers: list[USBDevice] = pydantic.Field(default_factory=list)
 
