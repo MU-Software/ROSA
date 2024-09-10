@@ -24,8 +24,12 @@ def print_exc(e: Exception) -> None:
 
 def set_session_order(shortened_order_id: str) -> None:
     try:
-        print(f"Order ID: {str_utils.b64_to_uuid(shortened_order_id)}")
-        httpx.put(url=f"http://localhost:28000/session/order?order_id={str_utils.b64_to_uuid(shortened_order_id)}")
+        order_id = shortened_order_id
+        if not str_utils.UUID_REGEX.match(shortened_order_id):
+            order_id = str_utils.b64_to_uuid(shortened_order_id)
+
+        print(f"Order ID: {order_id}")
+        httpx.put(url=f"http://localhost:28000/session/order?order_id={order_id}")
     except Exception as e:
         print_exc(e)
 
