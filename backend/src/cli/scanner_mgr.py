@@ -71,17 +71,20 @@ def scanner_manager(redis_dsn: str, port: int = 8000) -> None:
                 prev_msg = msg
                 for reader, process in list(processes.items()):
                     if reader not in msg.readers:
+                        print(f"Terminating process for {reader.name}")
                         if process.is_alive():
                             process.terminate()
                         del processes[reader]
 
                 for reader in msg.readers:
                     if reader not in processes:
+                        print(f"Starting process for {reader.name}")
                         processes[reader] = mp.Process(target=qr_scanner_handler, args=(reader, port))
                         processes[reader].start()
 
                 for reader, process in list(processes.items()):
                     if not process.is_alive():
+                        print(f"Process for {reader.name} is dead.")
                         del processes[reader]
                         msg.readers.remove(reader)
                         redis_session.set(redis_client.RedisKey.PUBSUB_CHANNEL, msg.model_dump_json())
