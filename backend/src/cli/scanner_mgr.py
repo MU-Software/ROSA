@@ -77,7 +77,7 @@ def scanner_manager(redis_dsn: str) -> None:
                     if not process.is_alive():
                         del processes[reader]
                         msg.readers.remove(reader)
-                        redis_session.set(redis_client.RedisKey.PUBSUB_CHANNEL, msg.model_dump())
+                        redis_session.set(redis_client.RedisKey.PUBSUB_CHANNEL, msg.model_dump_json())
         except redis.exceptions.ConnectionError as e:
             print(f"Redis connection error: {e}")
         except KeyboardInterrupt:
