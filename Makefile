@@ -53,7 +53,7 @@ docker-build:
 		--build-arg IMAGE_BUILD_DATETIME=$(shell date +%Y-%m-%d_%H:%M:%S) \
 		$(DOCKER_MID_BUILD_OPTIONS) $(PROJECT_DIR) $(DOCKER_END_BUILD_OPTIONS)
 
-docker-run:
+docker-api:
 	docker run -dit --rm -p 8000:8000 -e REDIS_DSN=$(REDIS_DSN) $(IMAGE_NAME)
 
 # Docker runner for Raspberry Pi
@@ -61,7 +61,7 @@ docker-run:
 # /dev is required for USB device access,
 # /var/lib/usbutils/usb.ids is required for lsusb,
 # /run/udev is required for udevadm
-docker-run-raspi:
+docker-api-raspi:
 	docker run \
 		-dit --rm --privileged --net=host \
 		-v /dev:/dev \
@@ -69,6 +69,14 @@ docker-run-raspi:
 		-v /run/udev:/run/udev:ro \
 		-e REDIS_DSN=$(REDIS_DSN) \
 		$(IMAGE_NAME)
+
+docker-cmd-raspi:
+	docker run \
+		-dit --rm --privileged --net=host \
+		-v /dev:/dev \
+		-v /var/lib/usbutils/usb.ids:/var/lib/usbutils/usb.ids \
+		-v /run/udev:/run/udev:ro \
+		$(IMAGE_NAME) /bin/bash -c "python -m src.cli $(REDIS_DSN)"
 
 # Server Execution
 api-local: docker-compose-up
