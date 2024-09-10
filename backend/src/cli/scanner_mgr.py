@@ -69,7 +69,7 @@ def scanner_manager(redis_dsn: str, port: int = 8000) -> None:
                     continue
 
                 prev_msg = msg
-                for reader, process in processes.items():
+                for reader, process in list(processes.items()):
                     if reader not in msg.readers:
                         if process.is_alive():
                             process.terminate()
@@ -80,7 +80,7 @@ def scanner_manager(redis_dsn: str, port: int = 8000) -> None:
                         processes[reader] = mp.Process(target=qr_scanner_handler, args=(reader, port))
                         processes[reader].start()
 
-                for reader, process in processes.items():
+                for reader, process in list(processes.items()):
                     if not process.is_alive():
                         del processes[reader]
                         msg.readers.remove(reader)
