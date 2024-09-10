@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import http
 import os
 import typing
 
@@ -10,6 +11,10 @@ import fastapi.staticfiles
 import playwright.async_api
 
 from . import redis_client, routes
+
+
+async def _redirect_to_front_404_handler(*_: tuple, **__: dict) -> fastapi.responses.RedirectResponse:
+    return fastapi.responses.RedirectResponse("/")
 
 
 def create_app(**kwargs: dict) -> fastapi.FastAPI:
@@ -40,6 +45,7 @@ def create_app(**kwargs: dict) -> fastapi.FastAPI:
             ),
         ],
     )
+    app.exception_handler(exc_class_or_status_code=http.HTTPStatus.NOT_FOUND)(_redirect_to_front_404_handler)
     app.mount("/static", fastapi.staticfiles.StaticFiles(directory="src/static"), name="static")
     for route in routes.get_routes():
         app.include_router(route)
