@@ -77,4 +77,4 @@ async def print_label(state: querierDI, committer: committerDI, browser: browser
                     logger.error("Failed to print label:\n", traceback.format_exception(e))
             state.printers = printer_list
 
-    return committer(state)
+    return await committer(state)
