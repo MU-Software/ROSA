@@ -37,8 +37,7 @@ class TSPL(pydantic.BaseModel):
         tspl = TSPL(...)
         with tspl as printer:
             with printer.page as page:
-                with page.image_buffer as img_buf:
-                    img_buf.write(image)  # pillow Image
+                page.write_image(image)  # pillow Image
 
         tspl.cmdlist  # list of TSPL commands
         tspl.print()  # send TSPL commands to printer
@@ -62,30 +61,6 @@ class TSPL(pydantic.BaseModel):
         def __exit__(self, *args: ContextExitArgType) -> None:
             self.tspl_context.cmdlist.extend(self.build_exit_cmds())
 
-    class ImageBuffer(TSPLCommandContextManager, pydantic.BaseModel):
-        def build_enter_cmds(self) -> list[bytes]:
-            # Clear Image Buffer
-            return [b"CLS"]
-
-        def build_exit_cmds(self) -> list[bytes]:
-            return []
-
-        def write(self, image: PIL.Image.Image) -> None:
-            bw_img = image.convert("1")
-            bit_arr_str = "".join(map(str, np.array(bw_img, dtype=int).flatten(order="c")))
-            img_hex_num_str = b"".join(
-                map(lambda x: int(x, 2).to_bytes(length=1, byteorder="little"), BIT_8_CUTTER.findall(bit_arr_str))
-            )
-
-            # BITMAP x, y, width, height, mode, bitmap data
-            # mode:
-            #   0: overwrite
-            #   1: OR
-            #   2: XOR
-            self.tspl_context.cmdlist.append(
-                f"BITMAP 0,0,{int(bw_img.size[0] / 8)},{bw_img.size[1]},0,".encode() + img_hex_num_str
-            )
-
     class Page(TSPLCommandContextManager, pydantic.BaseModel):
         def build_enter_cmds(self) -> list[bytes]:
             return [
@@ -95,19 +70,29 @@ class TSPL(pydantic.BaseModel):
                 f"DIRECTION {0 if self.tspl_context.direction == 'FORWARD' else 1}".encode(),
                 f"SPEED {self.tspl_context.speed}".encode() if self.tspl_context.speed else b"",
                 f"DENSITY {self.tspl_context.density}".encode(),
+                "CLS".encode(),
             ]
 
         def build_exit_cmds(self) -> list[bytes]:
             return []
 
-        @property
-        def image_buffer(self) -> TSPL.ImageBuffer:
-            return TSPL.ImageBuffer(tspl_context=self.tspl_context)
+        def write_image(self, image: PIL.Image.Image) -> None:
+            bw_img = image.convert("1")
+            bit_arr_str = "".join(map(str, np.array(bw_img, dtype=int).flatten(order="c")))
+            img_hex_num_str = b"".join(
+                map(lambda x: int(x, 2).to_bytes(length=1, byteorder="little"), BIT_8_CUTTER.findall(bit_arr_str))
+            )
+
+            # BITMAP x, y, width, height, mode, bitmap data
+            # mode: 0 = overwrite / 1 = OR / 2 = XOR
+            self.tspl_context.cmdlist.append(
+                f"BITMAP 0,0,{int(bw_img.size[0] / 8)},{bw_img.size[1]},0,".encode() + img_hex_num_str
+            )
 
     cmdlist: list[bytes] = pydantic.Field(default_factory=list)
 
-    size: tuple[float, float]  # in mm
-    gap: int = 0  # in mm, currently only support normal gap
+    size: tuple[float, float] = (80, 40)  # in mm
+    gap: int = 3  # in mm, currently only support normal gap
     offset: float = 0  # in mm
 
     speed: str | None = None  # Print speed in inch per second. (I hate this imperial unit)

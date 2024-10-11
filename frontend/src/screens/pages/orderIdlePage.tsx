@@ -18,7 +18,7 @@ const OrderSearchResultListItem: React.FC<{ order: Order; onClick?: () => void }
       <ListItemButton alignItems="flex-start" onClick={onClick} sx={{ flexDirection: 'column' }}>
         <Card sx={{ width: '100%' }}>
           <CardContent>
-            <Typography color="text.secondary" variant="body2">
+            <Typography color="text.secondary" variant="body2" component='div'>
               {new Date(order.first_paid_at).toLocaleString()}
               &nbsp;
               <Chip
@@ -28,7 +28,7 @@ const OrderSearchResultListItem: React.FC<{ order: Order; onClick?: () => void }
                 sx={{ fontSize: '0.75rem', lineHeight: '0.75rem', height: '1.25rem' }}
               />
             </Typography>
-            <Typography color="text.primary" variant="h6">{ticketInfo.name} {`소속 : ${ticketInfo.org}`}</Typography>
+            <Typography color="text.primary" variant="h6">{ticketInfo.name} [{`소속 : ${ticketInfo.org}`}]</Typography>
             <Typography color="text.secondary" variant="subtitle1">{ticketInfo.phone} / {ticketInfo.email}</Typography>
           </CardContent>
         </Card>

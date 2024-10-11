@@ -9,8 +9,8 @@ import fastapi
 import fastapi.middleware.cors
 import fastapi.staticfiles
 import playwright.async_api
-
-from . import redis_client, routes
+import src.redis_client as redis_client
+import src.routes as routes
 
 
 async def _redirect_to_front_404_handler(*_: tuple, **__: dict) -> fastapi.responses.RedirectResponse:

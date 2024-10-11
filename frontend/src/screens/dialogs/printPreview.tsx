@@ -5,11 +5,11 @@ import { DeskScreenContext } from '.'
 import { usePrintLabelMutation } from '../../hooks/useAPIs'
 import { ConfirmDialog } from './confirm'
 
-export const PrintPreviewImage: React.FC<{ image: Blob }> = ({ image }) => {
+export const PrintPreviewImage: React.FC<{ base64Image: string }> = ({ base64Image }) => {
   return (
     <img
       alt="인쇄 미리보기"
-      src={URL.createObjectURL(image)}
+      src={base64Image}
       style={{
         width: '100%',
         height: 'auto',

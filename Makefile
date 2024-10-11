@@ -2,7 +2,7 @@ include .env
 export $(shell sed 's/=.*//' .env)
 
 HOST ?= 127.0.0.1
-PORT ?= 8000
+PORT ?= 28000
 REDIS_DSN ?= redis://localhost:6379/0
 
 MAKEFLAGS += -j2

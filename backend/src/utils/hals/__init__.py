@@ -55,7 +55,7 @@ DeviceInfoType = cl.defaultdict[str, cl.defaultdict[str, Device]]
 def get_dev_udevadm_path_map() -> dict[str, str]:
     result: dict[str, str] = {}
 
-    dev_paths: list[str] = sp.run(["find", "/dev"], stdout=sp.PIPE).stdout.decode().splitlines()  # nosec B603, B607
+    dev_paths = sp.run(["find", "/dev"], stdout=sp.PIPE).stdout.decode().splitlines()  # nosec B603, B607
     for dev_path in dev_paths:
         if any(k in dev_path for k in ("by-id", "by-path", "char")):
             continue
@@ -95,7 +95,7 @@ def list_usb_devices() -> list[Device]:
         and "root hub" not in info["name"]
     ]
 
-    cdc_path_map: dict[str, str] = get_dev_udevadm_path_map()
+    cdc_path_map = get_dev_udevadm_path_map()
     usbinfo: DeviceInfoType = cl.defaultdict(lambda: cl.defaultdict(Device))  # type: ignore[arg-type,typeddict-item]
     for d_info in dev_infos:
         usbinfo[d_info["bus"]][d_info["device"]] |= d_info  # type: ignore[assignment]
@@ -117,5 +117,9 @@ def list_usb_devices() -> list[Device]:
     return dev_list
 
 
-def retrieve_usb_devices(names: list[str]) -> list[Device]:
-    return [dev for dev in list_usb_devices() if dev["name"] in names and dev["cdc_path"]]
+def retrieve_usb_device(cdc_path: str) -> Device | None:
+    return next((dev for dev in list_usb_devices() if dev["cdc_path"] == cdc_path), None)
+
+
+def retrieve_usb_devices(cdc_paths: list[str]) -> list[Device]:
+    return [dev for dev in list_usb_devices() if dev["cdc_path"] in cdc_paths]

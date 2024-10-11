@@ -36,7 +36,7 @@ ENV TZ=Asia/Seoul \
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && apt-get update \
-    && apt-get install -y --no-install-recommends curl wget ca-certificates gnupg lsb-release usbutils udev \
+    && apt-get install -y --no-install-recommends curl wget ca-certificates gnupg lsb-release supervisor usbutils udev \
     && apt-get autoremove -y \
     && apt-get autoclean -y \
     && apt-get clean -y \
@@ -49,6 +49,13 @@ ENV DEPLOYMENT_IMAGE_BUILD_DATETIME=$IMAGE_BUILD_DATETIME
 # Copy main app
 COPY ../backend/src/ /src
 
+# Copy supervisord configuration
+COPY ../infra/supervisord.ini /etc/supervisord.conf
+
+# Create directories for logs
+RUN mkdir -p /var/log/supervisor
+RUN mkdir -p /var/log/poca
+
 # Install playwright
 RUN playwright install-deps chromium
 RUN playwright install chromium
@@ -57,5 +64,6 @@ RUN playwright install chromium
 COPY --from=frontend-builder /app/dist /src/static
 
 # Run the application
-ARG WORKERS=4
-CMD [ "python3.12", "-m", "src", "--host", "0.0.0.0", "--port", "8000" ]
+# ARG WORKERS=4
+# CMD [ "python3.12", "-m", "src", "--host", "0.0.0.0", "--port", "8000" ]
+CMD [ "/usr/bin/supervisord" ]

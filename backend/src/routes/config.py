@@ -1,53 +1,41 @@
 import fastapi
-import pydantic
-from src.dependencies import committerDI, querierDI
-from src.models import AppState, Config, Devices
-from src.utils.hals import list_usb_devices, retrieve_usb_devices
+import src.dependencies as deps
+import src.models as models
+import src.utils.hals as hals
 
 router = fastapi.APIRouter(prefix="/config")
 
 
-@router.put(path="/domain")
-async def set_config(state: querierDI, committer: committerDI, payload: Config.ShopAPIConfig) -> AppState:
+@router.put(path="/session-state")
+def set_session_config(session: deps.lockedSessionInfoDI, payload: models.SessionStateConfig) -> models.SessionState:
+    """세션 설정 API"""
+    session.state = session.state.model_copy(update=payload.model_dump())
+    return session.state
+
+
+@router.put(path="/shop-domain")
+async def set_shop_domain_config(app_state: deps.lockedAppStateDI, payload: models.ShopAPIConfig) -> models.AppState:
     """상점 API 설정 API"""
-    if state.shop_api.domain != payload.domain:
-        state.order = None
-        state.handled_order = []
-    state.shop_api = payload
-    return await committer(state)
+    if app_state.shop_api.domain != payload.domain:
+        for session in app_state.sessions.values():
+            session.state.order = None
+            session.state.handled_order = []
+    app_state.shop_api = payload
+    return app_state
 
 
-@router.get(path="/domain/check-connectivity")
-async def check_connectivity(state: querierDI) -> dict[str, bool]:
+@router.get(path="/shop-domain/check-connectivity")
+async def check_connectivity(app_state: deps.appStateQuerierDI) -> dict[str, bool]:
     """상점 API 연결 확인 API"""
-    return {"status": await state.shop_api.can_communicate()}
-
-
-class SetDeviceRequestDTO(pydantic.BaseModel):
-    reader_names: list[str] = pydantic.Field(default_factory=list)
-    printer_names: list[str] = pydantic.Field(default_factory=list)
-
-    @pydantic.computed_field  # type: ignore[misc]
-    @property
-    def printers(self) -> list[Devices.USBDevice]:
-        return [Devices.USBDevice(**d) for d in retrieve_usb_devices(self.printer_names)]
-
-    @pydantic.computed_field  # type: ignore[misc]
-    @property
-    def readers(self) -> list[Devices.USBDevice]:
-        return [Devices.USBDevice(**d) for d in retrieve_usb_devices(self.reader_names)]
-
-
-@router.put(path="/devices")
-async def set_devices(state: querierDI, committer: committerDI, payload: SetDeviceRequestDTO) -> AppState:
-    """장치 정보 설정 API"""
-    state.readers = payload.readers
-    state.printers = payload.printers
-    return await committer(state)
+    return {"status": await app_state.shop_api.can_communicate()}
 
 
 @router.get(path="/devices/possibles")
-async def list_possible_devices(state: querierDI) -> list[Devices.USBDevice]:
+async def list_possible_devices(app_state: deps.appStateQuerierDI) -> list[models.USBDevice]:
     """등록 가능한 장치 목록 조회 API"""
-    registered_names: list[str] = [device.name for device in state.readers + state.printers]
-    return [Devices.USBDevice(**d) for d in list_usb_devices() if d["name"] not in registered_names]
+    used_block_paths: list[str] = []
+    for s in app_state.sessions.values():
+        device_list: list[models.USBDevice] = [d for d in (s.state.printer, s.state.reader) if d]
+        for d in device_list:
+            used_block_paths.append(d.block_path)
+    return [models.USBDevice(**d) for d in hals.list_usb_devices() if d["block_path"] not in used_block_paths]

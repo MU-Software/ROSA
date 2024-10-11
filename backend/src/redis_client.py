@@ -1,4 +1,5 @@
 import logging
+import typing
 
 import pydantic
 import redis
@@ -8,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class RedisKey:
+    APP_STATE_WRITE_LOCK = "app_state_write_lock"
     PUBSUB_CHANNEL = "global_status"
 
 
@@ -29,22 +31,21 @@ class RedisClient(pydantic.BaseModel):
         return aioredis.ConnectionPool.from_url(url=str(info.data["dsn"]))
 
     @pydantic.model_validator(mode="after")
-    def validate_connection(self) -> None:
+    def validate_connection(self) -> typing.Self:
         with redis.Redis(connection_pool=self.sync_connection_pool) as client:
             client.ping()
             logger.info("Redis connection established")
+        return self
 
     async def close(self) -> None:
         self.sync_connection_pool.disconnect(inuse_connections=True)
         await self.async_connection_pool.disconnect(inuse_connections=True)
         logger.info("Redis connection closed")
 
-    @pydantic.computed_field  # type: ignore[misc]
     @property
     def async_session(self) -> aioredis.Redis:
         return aioredis.Redis(connection_pool=self.async_connection_pool)
 
-    @pydantic.computed_field  # type: ignore[misc]
     @property
     def sync_session(self) -> redis.Redis:
         return redis.Redis(connection_pool=self.sync_connection_pool)

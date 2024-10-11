@@ -12,6 +12,7 @@ import {
   Chip,
   List,
   Paper,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -35,6 +36,8 @@ import { compareOrderOptionGroupsByName, compareOrderProductOptionsReverse } fro
 import { DeskScreenContext } from '../dialogs'
 import { ErrorToComponent } from '../dialogs/error'
 import { PrintPreviewImage } from '../dialogs/printPreview'
+
+const PNG_BASE64_HEADER = "data:image/png;base64,"
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
   '&:nth-of-type(even)': {
@@ -61,6 +64,7 @@ const SpaceBetweenHeaderAndButton = styled(Box)(({ theme }) => ({
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-end',
+  flexWrap: 'wrap',
   marginBottom: theme.spacing(2),
 }))
 
@@ -115,12 +119,16 @@ const ProductDetailListItem: React.FC<{ order: Order | null; orderProductRel: Or
   const { setDeskScreenState, closeDialog } = React.useContext(DeskScreenContext)
   const onError = (e: Error) => setDeskScreenState((ps) => ({ ...ps, dialogMode: 'error', dialogChildren: <ErrorToComponent error={e} /> }))
   const showLoading = () => setDeskScreenState((ps) => ({ ...ps, dialogMode: 'loading' }))
-  const showPrintPreview = (image: Blob) =>
+  const showPrintPreview = (images: string[]) => {
+    console.log(images)
     setDeskScreenState((ps) => ({
       ...ps,
       dialogMode: 'printPreview',
-      dialogChildren: <PrintPreviewImage image={image} />,
+      dialogChildren: <Stack spacing={2}>
+        {images.map((base64Image, i) => <PrintPreviewImage key={i} base64Image={PNG_BASE64_HEADER + base64Image} />)}
+      </Stack>,
     }))
+  }
 
   const [, setState] = React.useState({})
   const rerender = () => setState({})

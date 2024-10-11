@@ -35,7 +35,7 @@ export default tslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      '@cspell/spellchecker': ['error', { cspell: { words: ['packlint', 'codecov', 'tsup', 'rosa', 'poca'] } }],
+      '@cspell/spellchecker': ['error', { cspell: { words: ['packlint', 'codecov', 'tsup', 'rosa', 'poca', 'tspl', 'escp'] } }],
       // 'import/no-duplicates': ['error', { 'prefer-inline': true }],
       // 'import/order': ['error', { alphabetize: { order: 'asc', caseInsensitive: false } }],
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],

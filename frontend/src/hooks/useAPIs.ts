@@ -1,7 +1,8 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import * as R from 'remeda'
 
-import { APIErrorResponseType, AppState, DeskStatus, Order, OrderModifyRequest, SetDevices, USBDevice } from '../models'
+import { LOCAL_STORAGE_SESSION_ID_KEY } from '../consts/globals'
+import { APIErrorResponseType, DeskStatus, Order, OrderModifyRequest, SessionState, SessionStateConfig, SetDeviceRequest, USBDevice } from '../models'
 import { isAllTrue } from '../utils'
 
 export const DOMAIN = import.meta.env.VITE_POCA_URL
@@ -72,7 +73,10 @@ export const LocalRequest: <T>(reqOption: RequestFetchArguments) => Promise<T> =
     cache: 'no-cache',
     redirect: 'follow',
     signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
-    headers: new Headers({ 'Content-Type': 'application/json' }),
+    headers: new Headers({
+      'Content-Type': 'application/json',
+      'X-Session-ID': window.localStorage.getItem(LOCAL_STORAGE_SESSION_ID_KEY) ?? '',
+    }),
     credentials: 'include',
     referrerPolicy: 'origin',
     mode: 'cors',
@@ -84,15 +88,18 @@ export const LocalRequest: <T>(reqOption: RequestFetchArguments) => Promise<T> =
 }
 
 export const QUERY_KEYS = {
+  GET_SESSION: ['query', 'session'],
   GET_DEVICES_POSSIBLES: ['query', 'devices', 'possibles'],
 }
 
 export const MUTATION_KEYS = {
   SET_SESSION_DESK_STATUS: ['mutation', 'desk', 'set'],
   SET_SESSION_ORDER: ['mutation', 'order', 'set'],
-  SET_CONFIG_DOMAIN: ['mutation', 'config', 'shop_domain'],
-  SET_CONFIG_DEVICES: ['mutation', 'config', 'devices'],
-  CLEAR_SESSION: ['mutation', 'clear'],
+  SET_CONFIG_DOMAIN: ['mutation', 'config', 'shop_domain', 'set'],
+  SET_CONFIG_DEVICE: ['mutation', 'config', 'device', 'set'],
+  SET_CONFIG_SESSION_STATE: ['mutation', 'config', 'session_state', 'set'],
+  DELETE_CONFIG_DEVICE: ['mutation', 'config', 'device', 'delete'],
+  CREATE_SESSION: ['mutation', 'session', 'create'],
   CHECK_SHOP_API_CONNECTION: ['mutation', 'shop', 'check'],
   SEARCH_ORDER: ['mutation', 'order', 'search'],
   MODIFY_ORDER: ['mutation', 'order', 'modify'],
@@ -102,6 +109,15 @@ export const MUTATION_KEYS = {
 }
 
 // ==================== Query Hooks ====================
+export const useSessionQuery = () =>
+  useSuspenseQuery({
+    queryKey: QUERY_KEYS.GET_SESSION,
+    queryFn: () => LocalRequest<SessionState>({ route: 'session', method: 'POST' }),
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    retry: false,
+  })
 
 export const useListPossibleDevicesQuery = () =>
   useSuspenseQuery({
@@ -110,69 +126,86 @@ export const useListPossibleDevicesQuery = () =>
   })
 
 // ==================== Mutation Hooks ====================
+export const useCreateSessionMutation = () =>
+  useMutation({
+    mutationKey: MUTATION_KEYS.CREATE_SESSION,
+    mutationFn: () => LocalRequest<SessionState>({ route: 'session', method: 'POST' }),
+  })
+
+export const useListSessionMutation = () =>
+  useMutation({
+    mutationKey: MUTATION_KEYS.CREATE_SESSION,
+    mutationFn: () => LocalRequest<SessionState[]>({ route: 'session', method: 'GET' }),
+  })
 
 export const useSetSessionOrderMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.SET_SESSION_ORDER,
-    mutationFn: (orderId: string) => LocalRequest<AppState>({ route: `session/order?order_id=${orderId}`, method: 'PUT' }),
+    mutationFn: (orderId: string) => LocalRequest<SessionState>({ route: `session/my/order?order_id=${orderId}`, method: 'PUT' }),
   })
 
 export const useSetSessionDeskStatusMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.SET_SESSION_DESK_STATUS,
-    mutationFn: (deskStatus: DeskStatus) => LocalRequest<AppState>({ route: `session/desk?status=${deskStatus}`, method: 'PUT' }),
+    mutationFn: (deskStatus: DeskStatus) => LocalRequest<SessionState>({ route: `session/my/desk?status=${deskStatus}`, method: 'PUT' }),
   })
 
 export const useSetShopDomainConfigMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.SET_CONFIG_DOMAIN,
-    mutationFn: (config: AppState['shop_api']) => LocalRequest<AppState>({ route: 'config/domain', method: 'PUT', data: config }),
+    mutationFn: (config: SessionState['app_state']['shop_api']) => LocalRequest<SessionState>({ route: 'config/shop-domain', method: 'PUT', data: config }),
   })
 
-export const useSetDevicesConfigMutation = () =>
+export const useSetSessionStateConfigMutation = () =>
   useMutation({
-    mutationKey: MUTATION_KEYS.SET_CONFIG_DEVICES,
-    mutationFn: (config: SetDevices) => LocalRequest<AppState>({ route: 'config/devices', method: 'PUT', data: config }),
+    mutationKey: MUTATION_KEYS.SET_CONFIG_SESSION_STATE,
+    mutationFn: (config: SessionStateConfig) => LocalRequest<SessionState>({ route: 'config/session-state', method: 'PUT', data: config }),
   })
 
-export const useClearSessionMutation = () =>
+export const useSetDeviceConfigMutation = () =>
   useMutation({
-    mutationKey: MUTATION_KEYS.CLEAR_SESSION,
-    mutationFn: () => LocalRequest<AppState>({ route: 'session', method: 'DELETE' }),
+    mutationKey: MUTATION_KEYS.SET_CONFIG_DEVICE,
+    mutationFn: (payload: SetDeviceRequest) => LocalRequest<SessionState>({ route: `session/my/devices/${payload.deviceType}`, method: 'PUT', data: payload }),
+  })
+
+export const useDeleteDeviceConfigMutation = () =>
+  useMutation({
+    mutationKey: MUTATION_KEYS.DELETE_CONFIG_DEVICE,
+    mutationFn: (deviceType: 'reader' | 'printer') => LocalRequest<SessionState>({ route: `session/my/devices/${deviceType}`, method: 'DELETE' }),
   })
 
 export const useCheckShopAPIConnectionMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.CHECK_SHOP_API_CONNECTION,
-    mutationFn: () => LocalRequest<{ status: boolean }>({ route: 'config/domain/check-connectivity', method: 'GET' }),
+    mutationFn: () => LocalRequest<{ status: boolean }>({ route: 'config/shop-domain/check-connectivity', method: 'GET' }),
   })
 
 export const useSearchOrderMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.SEARCH_ORDER,
-    mutationFn: (keyword: string) => LocalRequest<Order[]>({ route: `session/order?custom_responses=${keyword}`, method: 'GET' }),
+    mutationFn: (keyword: string) => LocalRequest<Order[]>({ route: `session/my/order?custom_responses=${keyword}`, method: 'GET' }),
   })
 
 export const useModifyOrderMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.MODIFY_ORDER,
-    mutationFn: (req: OrderModifyRequest) => LocalRequest<Order>({ route: `session/order`, method: 'PATCH', data: req }),
+    mutationFn: (req: OrderModifyRequest) => LocalRequest<Order>({ route: `session/my/order`, method: 'PATCH', data: req }),
   })
 
 export const useRefundOrderMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.REFUND_ORDER,
-    mutationFn: (otpCode: string) => LocalRequest<Order>({ route: `session/order?otp=${otpCode}`, method: 'DELETE' }),
+    mutationFn: (otpCode: string) => LocalRequest<Order>({ route: `session/my/order?otp=${otpCode}`, method: 'DELETE' }),
   })
 
 export const usePreviewLabelMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.PREVIEW_LABEL,
-    mutationFn: () => LocalRequest<Blob>({ route: 'label/preview', method: 'GET', expectedMediaType: 'image/png' }),
+    mutationFn: () => LocalRequest<string[]>({ route: 'label/preview', method: 'GET' }),
   })
 
 export const usePrintLabelMutation = () =>
   useMutation({
     mutationKey: MUTATION_KEYS.PRINT_LABEL,
-    mutationFn: () => LocalRequest<AppState>({ route: 'label/print', method: 'POST' }),
+    mutationFn: () => LocalRequest<SessionState>({ route: 'label/print', method: 'POST' }),
   })

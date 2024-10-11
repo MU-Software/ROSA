@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Home</title>
+  <style>
+    /* Reset CSS */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      -moz-text-size-adjust: none;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+    }
+
+    body,
+    h1,
+    h2,
+    h3,
+    h4,
+    p,
+    figure,
+    blockquote,
+    dl,
+    dd {
+      margin-block-end: 0;
+    }
+
+    ul[role='list'],
+    ol[role='list'] {
+      list-style: none;
+    }
+
+    body {
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    button,
+    input,
+    label {
+      line-height: 1.1;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      text-wrap: balance;
+    }
+
+    a:not([class]) {
+      text-decoration-skip-ink: auto;
+      color: currentColor;
+    }
+
+    img,
+    picture {
+      max-width: 100%;
+      display: block;
+    }
+
+    input,
+    button,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    textarea:not([rows]) {
+      min-height: 10em;
+    }
+
+    :target {
+      scroll-margin-block: 5ex;
+    }
+  </style>
+  <style>
+    html,
+    body,
+    main {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+    }
+
+    main {
+      display: flex;
+      justify-content: start;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+      padding: 0;
+      margin: 0;
+      background-color: #000;
+      color: #fff;
+      word-break: keep-all;
+    }
+
+    .logo {
+      margin: 5rem 6rem;
+      aspect-ratio: 1;
+      width: 80vh;
+      min-width: 66.666vh;
+    }
+
+    #title-container {
+      display: flex;
+      flex-direction: column;
+      align-items: start;
+      text-align: start;
+    }
+
+    #title-container>h1 {
+      font-size: 8rem;
+      margin: 0;
+      margin-top: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    #title-container>h4 {
+      font-size: 4.5rem;
+      margin: 0;
+    }
+
+    #session-select-container {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-items: center;
+      gap: 0.5rem;
+      font-size: 2.5rem;
+
+      height: 4rem;
+    }
+
+    #session-select-container>* {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-items: center;
+      height: 100%;
+      margin: 0;
+      padding: 0.5rem;
+      flex-grow: 1;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <img class="logo" src="./pycon_logo.png" />
+    <div id="title-container" style="display: none;">
+      <h1 id="title">로딩 중입니다...</h1>
+      <h4 id="subtitle">Loading now...</h4>
+    </div>
+    <div id="session-select-container">
+      <label for="session-id-list">세션 선택</label>
+      <select id="session-id-list"></select>
+      <button id="session-open-btn">적용</button>
+    </div>
+  </main>
+
+  <script>
+    const sessionSelectContainer = document.getElementById('session-select-container')
+    const sessionSelector = document.getElementById('session-id-list')
+    const sessionOpenButton = document.getElementById('session-open-btn')
+    const titleContainer = document.getElementById('title-container')
+    const title = document.getElementById('title')
+    const subtitle = document.getElementById('subtitle')
+
+    const Messages = {
+      idle: { title: 'PyCon Korea 2024', subtitle: '접수 / 도우미 데스크 (Registration desk)' },
+      registering: { title: '%s님, 안녕하세요!', subtitle: '%s 소속' },
+      exit: { title: '즐거운 파이콘 되세요!', subtitle: 'Happy PyCon Korea!' },
+      closed: { title: '옆 창구를 이용해주세요.', subtitle: 'Please use next window.' }
+    }
+    let prevData = null
+
+    const request = async (method, route, data) => {
+      const result = await fetch(route, {
+        method: method,
+        cache: 'no-cache',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(5000),
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
+        referrerPolicy: 'origin',
+        mode: 'cors',
+        ...(['POST', 'PUT', 'PATCH'].includes(method) ? { body: JSON.stringify(data ?? {}) } : {}),
+      })
+      if (!result.ok) throw new Error('요청에 실패했습니다.', result.status, await result.text())
+
+      return await result.json()
+    }
+
+    let ws = null
+
+    const initialize = () => request('GET', '/session').then((data) => {
+      data.map((session) => {
+        const option = document.createElement('option')
+        option.value = session.id
+        option.innerText = session.id
+        sessionSelector.appendChild(option)
+      })
+    })
+
+    initialize()
+
+    const getNameAndOrgFromOrder = (order) => {
+      let name = ''
+      let org = ''
+
+      try {
+        order.products[0].options.forEach((option) => {
+          if (option.product_option_group.name === '성함') name = option.custom_response
+          else if (option.product_option_group.name === '소속') org = option.custom_response
+        })
+      } catch (e) {
+        console.error(e)
+      }
+      return { name, org }
+    }
+
+    const setData = (dataStr) => {
+      try {
+        data = JSON.parse(dataStr)
+
+        let message = Messages.closed
+        if (data.desk_status === 'registering') {
+          const { name, org } = getNameAndOrgFromOrder(data.order)
+          message = { ...Messages.registering }
+          message.title = message.title.replace('%s', name)
+          message.subtitle = message.subtitle.replace('%s', org)
+        } else if (data.desk_status === 'idle' && prevData?.desk_status === 'registering') {
+          message = Messages.exit
+          setTimeout(() => {
+            title.innerText = Messages.idle.title
+            subtitle.innerText = Messages.idle.subtitle
+          }, 3000)
+        } else {
+          message = Messages[data.desk_status || 'idle']
+        }
+        title.innerText = message.title
+        subtitle.innerText = message.subtitle
+
+        prevData = data
+      } catch (e) {
+        console.error(e)
+      }
+    }
+
+    const onSessionConnect = () => {
+      sessionSelectContainer.style.display = 'none'
+      titleContainer.style.display = 'flex'
+    }
+
+    const onSessionDisconnect = (evt) => {
+      sessionSelectContainer.style.display = 'flex'
+      titleContainer.style.display = 'none'
+      console.error(evt)
+
+      try { ws.close() } catch (e) { }
+      ws = null
+      initialize()
+    }
+
+    const connectSession = () => {
+      ws = new WebSocket(`/ws?session_id=${sessionSelector.value}`)
+      ws.onopen = () => {
+        sessionSelectContainer.style.display = 'none'
+        titleContainer.style.display = 'flex'
+      }
+      ws.onclose = onSessionDisconnect
+      ws.onerror = onSessionDisconnect
+      ws.onmessage = (evt) => setData(evt.data)
+    }
+
+    sessionOpenButton.addEventListener('click', connectSession)
+  </script>
+</body>
+
+</html>

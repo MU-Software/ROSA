@@ -1,6 +1,7 @@
 export type DeskStatus = 'idle' | 'registering' | 'closed'
 export type OrderProductStatus = 'pending' | 'paid' | 'used' | 'refunded'
 export type PaymentHistoryStatus = 'pending' | 'completed' | 'partial_refunded' | 'refunded'
+export type PrinterCmdType = 'ESCP' | 'TSPL'
 
 export type APIErrorResponseType = {
   type: string
@@ -76,20 +77,34 @@ export type USBDevice = {
   name: string
 }
 
-export type SetDevices = {
-  reader_names: string[]
-  printer_names: string[]
+export type PrinterProperties = {
+  cmd_type: PrinterCmdType
+  label: {
+    width: number
+    height: number
+  }
 }
 
-export type AppState = {
-  shop_api: {
-    domain: string
-    api_key: string
-    api_secret: string
+export type SetDeviceRequest = { cdc_path: string } & (({ deviceType: 'printer' } & PrinterProperties) | { deviceType: 'reader' })
+
+
+export type SessionStateConfig = {
+  automated: boolean
+  print_priced_option_label: boolean
+}
+
+export type SessionState = SessionStateConfig & {
+  id: string
+  app_state: {
+    shop_api: {
+      domain: string
+      api_key: string
+      api_secret: string
+    }
   }
 
-  readers: USBDevice[]
-  printers: USBDevice[]
+  printer: (USBDevice & PrinterProperties) | null
+  reader: USBDevice | null
 
   desk_status: DeskStatus
   order: Order | null
@@ -98,17 +113,23 @@ export type AppState = {
   commit_id: string
 }
 
-export const INITIAL_APP_SESSION_STATE: AppState = {
-  shop_api: {
-    domain: '',
-    api_key: '',
-    api_secret: '',
+export const INITIAL_APP_SESSION_STATE: SessionState = {
+  id: '',
+  app_state: {
+    shop_api: {
+      domain: '',
+      api_key: '',
+      api_secret: '',
+    },
   },
 
-  readers: [],
-  printers: [],
+  printer: null,
+  reader: null,
 
   desk_status: 'closed',
+  automated: false,
+  print_priced_option_label: false,
+
   order: null,
   handled_order: [],
 

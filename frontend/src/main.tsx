@@ -1,3 +1,4 @@
+import { wrap } from '@suspensive/react'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ErrorBoundary, FallbackProps } from 'react-error-boundary'
@@ -7,8 +8,9 @@ import * as R from 'remeda'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
-import { WS_DOMAIN } from './hooks/useAPIs'
-import { AppState, INITIAL_APP_SESSION_STATE } from './models'
+import { LOCAL_STORAGE_SESSION_ID_KEY } from './consts/globals'
+import { WS_DOMAIN, useSessionQuery } from './hooks/useAPIs'
+import { INITIAL_APP_SESSION_STATE, SessionState } from './models'
 import { DeskScreen } from './screens/deskScreen'
 import { WelcomeScreen } from './screens/welcomeScreen'
 
@@ -16,15 +18,16 @@ import '@fontsource/roboto/300.css'
 import '@fontsource/roboto/400.css'
 import '@fontsource/roboto/500.css'
 import '@fontsource/roboto/700.css'
+import { CircularProgress } from '@mui/material'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 3, refetchOnMount: 'always', gcTime: 1, staleTime: 10000 } },
 })
 
 export const GlobalContext = React.createContext<{
-  state: AppState
+  state: SessionState
   isWSConnected: boolean
-  dispatch: React.Dispatch<React.SetStateAction<AppState>>
+  dispatch: React.Dispatch<React.SetStateAction<SessionState>>
 }>({
   state: INITIAL_APP_SESSION_STATE,
   isWSConnected: false,
@@ -37,56 +40,67 @@ const App: React.FC = () => {
   const websocketRef = React.useRef<WebSocket>()
   const commitIdRef = React.useRef<string>()
 
+  const logAndSetIsWSConnected = (evt: Event, value: boolean) => {
+    console.log(evt.type, evt)
+    setIsWSConnected(value)
+  }
   const setData = (dataStr: string) => {
     try {
       const data = JSON.parse(dataStr)
       if (data.commit_id === commitIdRef.current) return
 
-      console.log('new commit', data.commit_id, commitIdRef.current)
+      console.log(`new commit : ${commitIdRef.current} -> ${data.commit_id}`)
       commitIdRef.current = data.commit_id
       dispatch(data)
     } catch (e) {
       console.error(e)
     }
   }
-  const logAndSetIsWSConnected = (evt: Event, value: boolean) => {
-    console.log(evt.type, evt)
-    setIsWSConnected(value)
-  }
 
-  React.useEffect(() => {
-    if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) return
+  const SessionApp = wrap
+    .ErrorBoundary({ fallback: <div>에러 발생, 새로고침을 해주세요.</div> })
+    .Suspense({ fallback: <CircularProgress /> })
+    .on(() => {
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { data } = useSessionQuery()
 
-    websocketRef.current = new WebSocket(`${WS_DOMAIN}/ws`)
-    websocketRef.current.onopen = (evt) => logAndSetIsWSConnected(evt, true)
-    websocketRef.current.onmessage = (evt) => setData(evt.data)
-    websocketRef.current.onclose = (evt) => logAndSetIsWSConnected(evt, false)
-    websocketRef.current.onerror = (evt) => logAndSetIsWSConnected(evt, false)
-  }, [state])
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      React.useEffect(() => {
+        if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN)
+          return
 
-  const onError = ({ error }: FallbackProps) => {
-    websocketRef.current?.close()
-    setTimeout(() => window.location.reload(), 100)
-    return R.isObjectType(error) ? <pre>{error.toLocaleString()}</pre> : null
-  }
+        window.localStorage.setItem(LOCAL_STORAGE_SESSION_ID_KEY, data.id)
+        websocketRef.current = new WebSocket(`${WS_DOMAIN}/ws?session_id=${data.id}`)
+        websocketRef.current.onmessage = (evt) => setData(evt.data)
+        websocketRef.current.onopen = (evt) => logAndSetIsWSConnected(evt, true)
+        websocketRef.current.onclose = (evt) => logAndSetIsWSConnected(evt, false)
+        websocketRef.current.onerror = (evt) => logAndSetIsWSConnected(evt, false)
+      }, [data.id])
 
-  return <ErrorBoundary fallbackRender={onError}>
-    <GlobalContext.Provider value={{ state, isWSConnected, dispatch }}>
-      <QueryClientProvider client={queryClient}>
-        <ReactQueryDevtools initialIsOpen={false} />
+      return <GlobalContext.Provider value={{ state, isWSConnected, dispatch }}>
         <BrowserRouter>
           <Routes>
             <Route element={<WelcomeScreen />} path="/welcome-screen" />
             <Route element={<DeskScreen />} path="/*" />
           </Routes>
         </BrowserRouter>
-      </QueryClientProvider>
-    </GlobalContext.Provider>
+      </GlobalContext.Provider>
+    })
+
+  return <ErrorBoundary fallbackRender={({ error }: FallbackProps) => {
+    websocketRef.current?.close()
+    setTimeout(() => window.location.reload(), 1000)
+    return R.isObjectType(error) ? <pre>{error.toLocaleString()}</pre> : <div>에러 발생, 새로고침을 해주세요.</div>
+  }}>
+    <SessionApp />
   </ErrorBoundary>
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
-  </React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <ReactQueryDevtools initialIsOpen={false} />
+      <App />
+    </QueryClientProvider>
+  </React.StrictMode >
 )

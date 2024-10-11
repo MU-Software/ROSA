@@ -46,7 +46,7 @@ const WelcomeScreenTextContainer = styled('div')(() => ({
 
 const DefaultText: React.FC = () => <WelcomeScreenTextContainer>
   <h1>PyCon Korea 2024</h1>
-  <h4>접수 / 도우미 데스크 (Registration & Help desk)</h4>
+  <h4>접수 / 도우미 데스크 (Registration desk)</h4>
 </WelcomeScreenTextContainer>
 
 const DeskNotAvailable: React.FC = () => <WelcomeScreenTextContainer>

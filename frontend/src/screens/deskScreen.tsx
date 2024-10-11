@@ -1,5 +1,6 @@
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import HistoryIcon from '@mui/icons-material/History'
-import ScreenShareIcon from '@mui/icons-material/ScreenShare'
+import MenuIcon from '@mui/icons-material/Menu'
 import SearchIcon from '@mui/icons-material/Search'
 import SettingsIcon from '@mui/icons-material/Settings'
 import {
@@ -10,6 +11,7 @@ import {
   Divider,
   Drawer,
   FormControl,
+  IconButton,
   InputBase,
   InputLabel,
   List,
@@ -42,8 +44,6 @@ import { OrderDetailPage } from './pages/orderDetailPage'
 import { OrderIdlePage } from './pages/orderIdlePage'
 
 const UUID_REGEX = /^[0-9A-F]{8}-[0-9A-F]{4}-[4][0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i
-
-const drawerWidth = 280
 
 const PageOuterContainer = styled(Box)(() => ({
   width: '100%',
@@ -104,14 +104,26 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }))
 
+type WrappedDeskScreenStateType = {
+  initialWSConnected: boolean
+  showHistoryDrawer: boolean
+  searchResult: Order[] | undefined
+}
+
 const WrappedDeskScreen: React.FC = () => {
   const navigate = useNavigate()
 
-  const [initialWSConnected, setInitialWSConnected] = React.useState(false)
+  const [screenState, setScreenState] = React.useState<WrappedDeskScreenStateType>({
+    initialWSConnected: false,
+    showHistoryDrawer: false,
+    searchResult: undefined,
+  })
+  const setInitialWSConnected = (value: boolean) => setScreenState((ps) => ({ ...ps, initialWSConnected: value }))
+  const toggleHistoryDrawer = () => setScreenState((ps) => ({ ...ps, showHistoryDrawer: !ps.showHistoryDrawer }))
+  const setSearchResult = (orders?: Order[]) => setScreenState((ps) => ({ ...ps, searchResult: orders }))
   const { state, isWSConnected } = React.useContext(GlobalContext)
 
   const searchInputRef = React.useRef<HTMLInputElement>(null)
-  const [searchResult, setSearchResult] = React.useState<Order[] | undefined>(undefined)
 
   const setSessionOrderMutation = useSetSessionOrderMutation()
   const setSessionDeskStatusMutation = useSetSessionDeskStatusMutation()
@@ -139,7 +151,8 @@ const WrappedDeskScreen: React.FC = () => {
   const handleDeskStatusChange = (status: DeskStatus, skipConfirm?: boolean) => {
     const changeDeskStatus = () => {
       showLoading()
-      setSessionDeskStatusMutation.mutate(status, { onSuccess: closeDialog, onError })
+      if (state.desk_status === status) return closeDialog()
+      else setSessionDeskStatusMutation.mutate(status, { onSuccess: closeDialog, onError })
     }
 
     if (state.order && !skipConfirm) showClosingOrder('데스크 접수 상태 변경', changeDeskStatus)
@@ -178,11 +191,6 @@ const WrappedDeskScreen: React.FC = () => {
   }
 
   React.useEffect(() => {
-    if (!(R.isString(state.shop_api.domain) && !R.isEmpty(state.shop_api.domain)))
-      setDeskScreenState((ps) => ({ ...ps, dialogMode: 'config' }))
-  }, [state.shop_api, setDeskScreenState])
-
-  React.useEffect(() => {
     if (state.order && R.isString(state.order.id) && UUID_REGEX.test(state.order.id)) {
       navigate(`/order/${state.order.id}`)
     } else if (state.desk_status === 'closed') {
@@ -193,15 +201,15 @@ const WrappedDeskScreen: React.FC = () => {
   }, [state.order, state.desk_status, navigate])
 
   React.useEffect(() => {
-    if (!initialWSConnected && !isWSConnected) {
+    if (!screenState.initialWSConnected && !isWSConnected) {
       setDeskScreenState((ps) => ({ ...ps, dialogMode: 'loading' }))
-    } else if (!initialWSConnected && isWSConnected) {
+    } else if (!screenState.initialWSConnected && isWSConnected) {
       setInitialWSConnected(true)
       closeDialog()
-    } else if (initialWSConnected && !isWSConnected) {
+    } else if (screenState.initialWSConnected && !isWSConnected) {
       setDeskScreenState((ps) => ({ ...ps, dialogMode: 'pocaConnectionLost' }))
     }
-  }, [initialWSConnected, isWSConnected, closeDialog, setDeskScreenState])
+  }, [screenState.initialWSConnected, isWSConnected, closeDialog, setDeskScreenState])
 
   return (
     <Box sx={{ height: '100%' }}>
@@ -209,6 +217,12 @@ const WrappedDeskScreen: React.FC = () => {
 
       <GradientAppBar>
         <Toolbar sx={{ justifyContent: 'space-between', gap: '1rem' }}>
+          <Tooltip title="처리한 주문 내역">
+            <Button onClick={toggleHistoryDrawer} sx={{ color: '#fff', minWidth: 'initial' }}>
+              <MenuIcon />
+            </Button>
+          </Tooltip>
+
           <Typography component="div" variant="h6">
             <a href="/" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bolder' }}>ROSA</a>
           </Typography>
@@ -216,7 +230,6 @@ const WrappedDeskScreen: React.FC = () => {
           <Search>
             <SearchIconWrapper><SearchIcon /></SearchIconWrapper>
             <StyledInputBase
-              inputProps={{ 'aria-label': 'search' }}
               inputRef={searchInputRef}
               onKeyDown={onEnterPress}
               placeholder="주문 검색 (콤마로 여러 키워드를 같이 검색하실 수 있어요!)"
@@ -245,38 +258,18 @@ const WrappedDeskScreen: React.FC = () => {
               <SettingsIcon />
             </Button>
           </Tooltip>
-
-          <Tooltip title="외부 디스플레이 열기">
-            <a
-              href="/welcome-screen"
-              onClick={(el) => {
-                preventEventDefault(el)
-                window.open(el.currentTarget.href, 'popup', 'width=600,height=600')
-                return false
-              }}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <Button sx={{ color: '#fff' }}>
-                <ScreenShareIcon />
-              </Button>
-            </a>
-          </Tooltip>
         </Toolbar>
       </GradientAppBar>
 
       <Box component="main" sx={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%' }}>
-        <Drawer
-          sx={{
-            width: drawerWidth,
-            flexShrink: 0,
-            '& .MuiDrawer-paper': { width: drawerWidth, boxSizing: 'border-box', zIndex: 'unset' },
-          }}
-          variant="permanent"
-        >
-          <Toolbar />
-          <List>
-            <ListSubheader>처리 이력</ListSubheader>
+        <Drawer sx={{ flexShrink: 0, '& .MuiDrawer-paper': { boxSizing: 'border-box' } }} open={screenState.showHistoryDrawer}>
+          <List sx={{ padding: 0 }}>
+            <ListSubheader sx={{ height: '64px' }}>
+              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>처리 이력</div>
+                <IconButton onClick={toggleHistoryDrawer}><ChevronLeftIcon /></IconButton>
+              </Box>
+            </ListSubheader>
             <Divider />
             {[...state.handled_order].reverse().map((order) => {
               const ticketInfo = getTicketInfoFromOrder(order)
@@ -303,7 +296,7 @@ const WrappedDeskScreen: React.FC = () => {
           <PageMidContainer>
             <PageInnerContainer>
               <Routes>
-                <Route element={<OrderIdlePage orders={searchResult} setOrder={setOrder} />} path="/" />
+                <Route element={<OrderIdlePage orders={screenState.searchResult} setOrder={setOrder} />} path="/" />
                 <Route element={<OrderDetailPage closeOrder={() => handleDeskStatusChange('idle', true)} />} path="/order/:orderId" />
                 <Route element={<DeskClosedPage />} path="/closed" />
                 <Route element={<OrderIdlePage />} path="*" />

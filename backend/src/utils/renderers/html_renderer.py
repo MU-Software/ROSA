@@ -19,7 +19,7 @@ def get_template_obj(template: str) -> jinja2.Template:
     )
 
 
-@async_lru.alru_cache(maxsize=32)
+@async_lru.alru_cache(maxsize=64)
 async def _render_html(browser: playwright.async_api.Browser, html: str, element: str | None = None) -> bytes:
     page = await browser.new_page()
     await page.set_content(html=html, wait_until="networkidle")
