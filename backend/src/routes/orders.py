@@ -1,11 +1,16 @@
 import http
+import io
+import logging
+import traceback
 
 import fastapi
 import httpx
+import PIL.Image
 import src.dependencies as deps
 import src.models as models
 import src.utils.stdlibs.str_utils as str_utils
 
+logger = logging.getLogger(__name__)
 router = fastapi.APIRouter(prefix="/session/my/order")
 
 
@@ -50,18 +55,40 @@ async def refund_order(session: deps.lockedSessionInfoDI, otp: str | None = None
 async def handle_automated_session_order(
     redis_cli: deps.redisDI,
     session: deps.sessionInfoQuerierDI,
+    browser: deps.browserDI,
     order_id: str | None = None,
 ) -> models.SessionState:
     """세션에 주문정보를 설정할 시 라벨을 출력하고 주문을 해제하는 API"""
+    state = session.state
+
     if not (order_id and str_utils.UUID_REGEX.match(order_id)):
         raise fastapi.exceptions.HTTPException(
             status_code=http.HTTPStatus.UNPROCESSABLE_ENTITY, detail="order_id는 필수입니다."
         )
 
-    order_data = await session.state.app.shop_api.get_order(order_id=order_id)
+    order_data = await state.app.shop_api.get_order(order_id=order_id)
     async with deps.locked_session_info_context(
-        redis_cli=redis_cli, session_id=session.state.id, used_as_dependency=False
-    ) as session:
-        session.state.order = order_data
+        redis_cli=redis_cli, session_id=state.id, used_as_dependency=False
+    ) as tmp_session:
+        tmp_session.state.order = order_data
 
-    return session.state
+    ctx = state.printer.label.model_dump(mode="json") if state.printer else {"width": "960", "height": "410"}
+    images: list[bytes]
+    if state.print_priced_option_label:
+        images = await state.order.get_all_rendered_label_images(browser, ctx)
+    else:
+        images = [await state.order.get_rendered_nameplate_label_image(browser, ctx)]
+
+    for image_bytes in images:
+        with io.BytesIO(image_bytes) as image_io:
+            if printer := state.printer:
+                try:
+                    printer.print_image(image=PIL.Image.open(image_io))
+                except Exception as e:
+                    logger.error("Failed to print label:\n", traceback.format_exception(e))
+
+    async with deps.locked_session_info_context(
+        redis_cli=redis_cli, session_id=state.id, used_as_dependency=False
+    ) as tmp_session:
+        tmp_session.state.order = None
+        return tmp_session.state

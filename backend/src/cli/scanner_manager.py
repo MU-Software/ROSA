@@ -21,21 +21,25 @@ def print_exc(e: Exception) -> None:
     logger.warning(f"{ERROR_MSG_DIVIDER.format(e.__class__.__name__)}{''.join(traceback.format_exception(e))}")
 
 
-def set_session_order(shortened_order_id: str, port: int) -> None:
+def set_session_order(shortened_order_id: str, port: int, automated: bool) -> None:
     try:
         order_id = shortened_order_id
         if not str_utils.UUID_REGEX.match(shortened_order_id):
             order_id = str_utils.b64_to_uuid(shortened_order_id)
 
         print(f"Order ID: {order_id}")
-        httpx.put(url=f"http://localhost:{port}/session/order?order_id={order_id}")
+        main_path = f"http://localhost:{port}/session/my/order"
+        sub_path = f"/automated?order_id={order_id}" if automated else f"?order_id={order_id}"
+        url = main_path + sub_path
+        print(f"Request to {url=}")
+        httpx.put(url=url)
     except Exception as e:
         print_exc(e)
 
 
-def qr_scanner_handler(usb_dev: models.USBDevice, port: int) -> None:
+def qr_scanner_handler(usb_dev: models.USBDevice, port: int, automated: bool) -> None:
     try:
-        callback = functools.partial(set_session_order, port=port)
+        callback = functools.partial(set_session_order, port=port, automated=automated)
         device = qrcode_serial.SerialInfo(port=usb_dev.cdc_path)
         device.retrieve_and_exec(callback=callback)
     except KeyboardInterrupt:
