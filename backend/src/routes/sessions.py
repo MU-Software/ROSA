@@ -1,5 +1,4 @@
 import datetime
-import pathlib
 
 import fastapi
 import fastapi.exceptions
@@ -54,24 +53,29 @@ async def set_my_desk_status(
 
 
 class SetDeviceRequestPayload(pydantic.BaseModel):
-    cdc_path: pydantic.FilePath
+    cdc_path: str
 
     @pydantic.field_validator("cdc_path", mode="before")
     @classmethod
-    def validate_cdc_path(cls, v: pathlib.Path) -> pathlib.Path:
-        if not hals.retrieve_usb_device(v.as_posix()):
+    def validate_cdc_path(cls, v: str) -> str:
+        if not hals.retrieve_usb_device(v):
             raise pydantic.ValidationError("CDC path must be a block device.")
         return v
 
     def as_model(self) -> models.USBDevice:
-        return models.USBDevice(**hals.retrieve_usb_device(self.cdc_path.as_posix()))
+        return models.USBDevice(**hals.retrieve_usb_device(self.cdc_path))
 
 
 class SetPrinterRequestPayload(SetDeviceRequestPayload, pydantic.BaseModel):
-    cmd_mode: models.PrinterCmdType
+    cmd_mode: models.PrinterCmdType = "ESCP"
+    label: models.Printer.Label
 
     def as_model(self) -> models.Printer:
-        return models.Printer(**hals.retrieve_usb_device(self.cdc_path.as_posix()), cmd_type=self.cmd_mode)
+        return models.Printer(
+            **hals.retrieve_usb_device(self.cdc_path),
+            cmd_type=self.cmd_mode,
+            label=self.label,
+        )
 
 
 @router.put(path="/my/devices/reader")
