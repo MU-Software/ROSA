@@ -1,3 +1,5 @@
+import asyncio
+import datetime
 import http
 import io
 import logging
@@ -12,6 +14,7 @@ import src.utils.stdlibs.str_utils as str_utils
 
 logger = logging.getLogger(__name__)
 router = fastapi.APIRouter(prefix="/session/my/order")
+WAITING_TIME = datetime.timedelta(seconds=6)
 
 
 @router.put(path="")
@@ -70,8 +73,9 @@ async def handle_automated_session_order(
     async with deps.locked_session_info_context(
         redis_cli=redis_cli, session_id=state.id, used_as_dependency=False
     ) as tmp_session:
-        tmp_session.state.order = order_data
+        tmp_session.state.order = state.order = order_data
 
+    start_time = datetime.datetime.now()
     ctx = state.printer.label.model_dump(mode="json") if state.printer else {"width": "960", "height": "410"}
     images: list[bytes]
     if state.print_priced_option_label:
@@ -86,6 +90,10 @@ async def handle_automated_session_order(
                     printer.print_image(image=PIL.Image.open(image_io))
                 except Exception as e:
                     logger.error("Failed to print label:\n", traceback.format_exception(e))
+
+    end_time = datetime.datetime.now()
+    took_time = end_time - start_time
+    await asyncio.sleep((WAITING_TIME - took_time).seconds)
 
     async with deps.locked_session_info_context(
         redis_cli=redis_cli, session_id=state.id, used_as_dependency=False
