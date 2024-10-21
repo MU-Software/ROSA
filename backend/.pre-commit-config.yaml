@@ -13,6 +13,8 @@ repos:
     - id: check-xml
     - id: check-yaml
     - id: check-added-large-files
+      args:
+        - --maxkb=3000
     - id: detect-aws-credentials
       args:
         - --allow-missing-credentials
