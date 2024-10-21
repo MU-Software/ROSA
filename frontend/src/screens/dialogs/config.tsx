@@ -135,7 +135,7 @@ export const ConfigDialog: React.FC = () => {
           deviceType,
           cdc_path: selectRef.current.value,
           cmd_type: 'ESCP',
-          label: { width: 90, height: 38 },
+          label: { width: 960, height: 410 },
         }, {
           onSuccess: () => addSnackbar('장치 추가 성공', 'success'),
           onError: () => addSnackbar('장치 추가 실패', 'error'),
