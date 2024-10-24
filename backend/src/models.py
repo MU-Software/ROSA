@@ -131,13 +131,20 @@ class OrderDTO(pydantic.BaseModel):
     ) -> bytes:
         # TODO: FIXME: 지금이야 단건 주문만 가능하지만, 만약 여러 상품을 한번에 주문할 수 있는 경우 수정 필요
         ticket_opr = self.products[0]
+        user_name = ticket_opr.get_option_by_name("성함").custom_response or ""
+        user_org = ticket_opr.get_option_by_name("소속").custom_response or ""
+        template_path_str = (
+            "src/templates/nameplate_label_for_volunteer.html"
+            if user_org == "자원봉사자"
+            else "src/templates/nameplate_label.html"
+        )
         return html_renderer.image_to_bw(
             image=await html_renderer.render_html(
                 browser=browser,
-                template=pathlib.Path("src/templates/nameplate_label.html").read_text(),
+                template=pathlib.Path(template_path_str).read_text(),
                 context={
-                    "user_name": ticket_opr.get_option_by_name("성함").custom_response or "",
-                    "user_org": ticket_opr.get_option_by_name("소속").custom_response or "",
+                    "user_name": user_name,
+                    "user_org": user_org,
                     "qrcode_data": str_utils.uuid_to_b64(self.id),
                 }
                 | additional_context,
