@@ -75,6 +75,7 @@ export type USBDevice = {
   block_path: string
   cdc_path: string
   name: string
+  serial_number: string | null
 }
 
 export type PrinterProperties = {

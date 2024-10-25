@@ -83,6 +83,7 @@ export const ConfigDialog: React.FC = () => {
   const checkConnectionMutation = useCheckShopAPIConnectionMutation()
   const setShopDomainConfigMutation = useSetShopDomainConfigMutation()
   const setSessionStateConfigMutation = useSetSessionStateConfigMutation()
+  const deleteDeviceConfigMutation = useDeleteDeviceConfigMutation()
 
   const { enqueueSnackbar } = useSnackbar()
   const addSnackbar = (c: string | React.ReactNode, v: VariantType) => enqueueSnackbar(c, SnackBarOptionGen(v))
@@ -115,6 +116,13 @@ export const ConfigDialog: React.FC = () => {
     })
   }
 
+  const deleteDevice = (deviceType: 'printer' | 'reader') => {
+    deleteDeviceConfigMutation.mutate(deviceType, {
+      onSuccess: () => addSnackbar('장치 삭제 성공', 'success'),
+      onError: () => addSnackbar('장치 삭제 실패', 'error'),
+    })
+  }
+
   const PossibleDevices = wrap
     .ErrorBoundary({ fallback: <Box sx={{ color: 'red' }}>장치 목록을 불러오는 중 오류가 발생했습니다.</Box> })
     .Suspense({ fallback: <CircularProgress size="0.875rem" /> })
@@ -125,8 +133,6 @@ export const ConfigDialog: React.FC = () => {
       const { data } = useListPossibleDevicesQuery()
       // eslint-disable-next-line react-hooks/rules-of-hooks
       const setDeviceConfigMutation = useSetDeviceConfigMutation()
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const deleteDeviceConfigMutation = useDeleteDeviceConfigMutation()
 
       const addDevice = (deviceType: 'printer' | 'reader') => {
         if (!selectRef.current || selectRef.current.value === '') return
@@ -153,8 +159,6 @@ export const ConfigDialog: React.FC = () => {
       </Box>
         : <>추가 가능한 장치가 없습니다.</>
     })
-
-
 
   return <Dialog TransitionComponent={ConfigTransition} disableEscapeKeyDown fullScreen open={dialogMode === 'config'}>
     <AppBar>
@@ -319,19 +323,20 @@ export const ConfigDialog: React.FC = () => {
               <TableCell>{state.printer?.name ?? "등록된 장치 없음"}</TableCell>
               <TableCell>
                 <Stack direction="column" sx={{ gap: '0.5rem' }}>
-                  <TextField defaultValue={state.printer?.block_path ?? ""} disabled label="장치 경로 (USB)" />
-                  <TextField defaultValue={state.printer?.cdc_path ?? ""} disabled label="장치 경로 (CDC)" />
+                  <TextField defaultValue={state.printer?.block_path ?? ""} label="장치 경로 (USB)" />
+                  <TextField defaultValue={state.printer?.cdc_path ?? ""} label="장치 경로 (CDC)" />
                   <Stack direction="row" sx={{ flexGrow: '1', gap: '0.5rem' }}>
-                    <TextField sx={{ flexGrow: '1' }} defaultValue={state.printer?.label.width ?? ""} disabled label="라벨 Width" />
-                    <TextField sx={{ flexGrow: '1' }} defaultValue={state.printer?.label.height ?? ""} disabled label="라벨 Height" />
-                    <Select defaultValue={state.printer?.cmd_type ?? "ESCP"} disabled label="장치 타입">
+                    <TextField sx={{ flexGrow: '1' }} defaultValue={state.printer?.label.width ?? ""} label="라벨 Width" />
+                    <TextField sx={{ flexGrow: '1' }} defaultValue={state.printer?.label.height ?? ""} label="라벨 Height" />
+                    <Select defaultValue={state.printer?.cmd_type ?? "ESCP"} label="장치 타입">
                       <option value="ESCP">ESC/P</option>
                       <option value="TSPL">TSPL</option>
                     </Select>
+                    <TextField defaultValue={state.printer?.serial_number || ""} label="기기 일련번호" />
                   </Stack>
                   <Stack direction="row" sx={{ flexGrow: '1', gap: '0.5rem' }}>
                     <Button variant="contained" sx={{ flexGrow: '1' }} disabled={!state.printer} startIcon={<AppRegistrationIcon />} onClick={() => { }}>수정</Button>
-                    <Button variant="contained" sx={{ flexGrow: '1' }} disabled={!state.printer} startIcon={<CloseIcon />} onClick={() => { }}>삭제</Button>
+                    <Button variant="contained" sx={{ flexGrow: '1' }} disabled={!state.printer} startIcon={<CloseIcon />} onClick={()  => deleteDevice('printer')}>삭제</Button>
                   </Stack>
                 </Stack>
               </TableCell>
@@ -346,11 +351,12 @@ export const ConfigDialog: React.FC = () => {
               <TableCell>{state.reader?.name ?? "등록된 장치 없음"}</TableCell>
               <TableCell>
                 <Stack direction="column" sx={{ gap: '0.5rem' }}>
-                  <TextField defaultValue={state.reader?.block_path ?? ""} disabled label="장치 경로 (USB)" />
-                  <TextField defaultValue={state.reader?.cdc_path ?? ""} disabled label="장치 경로 (CDC)" />
+                  <TextField defaultValue={state.reader?.block_path ?? ""} label="장치 경로 (USB)" />
+                  <TextField defaultValue={state.reader?.cdc_path ?? ""} label="장치 경로 (CDC)" />
+                  <TextField defaultValue={state.reader?.serial_number || ""} label="기기 일련번호" />
                   <Stack direction="row" sx={{ flexGrow: '1', gap: '0.5rem' }}>
                     <Button variant="contained" sx={{ flexGrow: '1' }} disabled={!state.reader} startIcon={<AppRegistrationIcon />} onClick={() => { }}>수정</Button>
-                    <Button variant="contained" sx={{ flexGrow: '1' }} disabled={!state.reader} startIcon={<CloseIcon />} onClick={() => { }}>삭제</Button>
+                    <Button variant="contained" sx={{ flexGrow: '1' }} disabled={!state.reader} startIcon={<CloseIcon />} onClick={() => deleteDevice('reader')}>삭제</Button>
                   </Stack>
                 </Stack>
               </TableCell>
