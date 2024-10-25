@@ -74,6 +74,19 @@ async def handle_automated_session_order(
         redis_cli=redis_cli, session_id=state.id, used_as_dependency=False
     ) as tmp_session:
         tmp_session.state.order = state.order = order_data
+        # TODO: FIXME: 지금이야 단건 주문만 가능하지만, 만약 여러 상품을 한번에 주문할 수 있는 경우 수정 필요
+        ticket_opr = order_data.products[0]
+        if order_data.current_status not in ("completed", "partial_refunded") or ticket_opr.status != "paid":
+            tmp_session.state.automated = False
+
+    async with deps.locked_session_info_context(
+        redis_cli=redis_cli, session_id=state.id, used_as_dependency=False
+    ) as tmp_session:
+        # TODO: FIXME: 지금이야 단건 주문만 가능하지만, 만약 여러 상품을 한번에 주문할 수 있는 경우 수정 필요
+        tmp_session.state.order = state.order = await session.state.app.shop_api.modify_order(
+            order_id=session.state.order.id,
+            data=models.OrderModifyRequestDTO(products=[{"id": state.order.products[0].id, "status": "used"}]),
+        )
 
     start_time = datetime.datetime.now()
     ctx = state.printer.label.model_dump(mode="json") if state.printer else {"width": "960", "height": "410"}
