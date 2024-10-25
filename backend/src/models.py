@@ -210,6 +210,7 @@ class USBDevice(pydantic.BaseModel):
     block_path: str
     cdc_path: str
     name: str
+    serial_number: str | None = None
 
     model_config = pydantic.ConfigDict(frozen=True)
 
