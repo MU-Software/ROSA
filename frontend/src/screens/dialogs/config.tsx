@@ -160,7 +160,7 @@ export const ConfigDialog: React.FC = () => {
     <AppBar>
       <Toolbar>
         <SettingsIcon />
-        <Typography component="div" sx={{ ml: 2, flex: 1 }} variant="h6">설정</Typography>
+        <Typography component="div" sx={{ ml: 2, flex: 1 }} variant="h6">설정 [세션 ID: {state.id}]</Typography>
         <Button autoFocus color="inherit" onClick={closeDialog} startIcon={<CloseIcon />}>닫기</Button>
       </Toolbar>
     </AppBar>
