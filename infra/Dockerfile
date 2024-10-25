@@ -1,5 +1,5 @@
 # Frontend Builder
-FROM --platform=linux/arm64 node:22-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -12,7 +12,7 @@ RUN pnpm install -r --offline
 RUN pnpm run build
 
 # ==============================================================================
-FROM --platform=linux/arm64 python:3.12-slim-bookworm AS runtime
+FROM python:3.12-slim-bookworm AS runtime
 SHELL [ "/bin/bash", "-euxvc"]
 
 RUN apt-get update; \
